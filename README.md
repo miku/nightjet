@@ -14,6 +14,8 @@ Some goals are to
 
 * [x] a program that generates a notebook gif, with a colorful band
 
+![Notebook with random colors](x/nb/notebook.webp)
+
 ## TODO
 
 * [ ] a TUI for language learning, drill, not too fancy, with some gaming aspect
