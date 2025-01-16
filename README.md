@@ -38,4 +38,21 @@ Some goals are to
 * [ ] A RAG for catalog metadata
 * [ ] A metadata completion tool (do a fine tune over metadata that is correct and then blank out known fields), maybe relate to the theme of metadata quality
 * [ ] write a pure Go version of wapiti
+* [ ] something like cbonsai, but for palm tree
+
+## Models
+
+* [Codestral](https://ollama.com/library/codestral:22b), via [Chat AI](https://arxiv.org/abs/2407.00110)
+* [Claude](https://en.wikipedia.org/wiki/Claude_(language_model))
+* [Gemini](https://gemini.google.com)
+* [Chatgpt](https://chatgpt.com)
+
+## Readings
+
+
+## Misc
+
+* [Everything I built with Claude Artifacts this week](https://simonwillison.net/2024/Oct/21/claude-artifacts/)
+* [How I program with LLMs](https://crawshaw.io/blog/programming-with-llms)
+
 
