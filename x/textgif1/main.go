@@ -4,6 +4,7 @@ import (
 	"flag"
 	"image"
 	"image/color"
+	"image/draw"
 	"image/gif"
 	"io/ioutil"
 	"log"
@@ -13,7 +14,7 @@ import (
 	"github.com/golang/freetype/truetype"
 )
 
-func createFrame(text string, font *truetype.Font, width, height int) *image.Paletted {
+func createFrame(text string, font *truetype.Font, width, height int, showCursor bool) *image.Paletted {
 	img := image.NewPaletted(
 		image.Rect(0, 0, width, height),
 		color.Palette{
@@ -33,9 +34,14 @@ func createFrame(text string, font *truetype.Font, width, height int) *image.Pal
 	pt := freetype.Pt(20, 40)
 	c.DrawString(text, pt)
 
+	cursorX := 20
 	if len(text) > 0 {
-		cursorX := 20 + (len(text) * 13)
-		c.DrawString("|", freetype.Pt(cursorX, 40))
+		cursorX = 20 + (len(text) * 13)
+	}
+
+	if showCursor {
+		cursor := image.Rect(cursorX, 20, cursorX+13, 45)
+		draw.Draw(img, cursor, &image.Uniform{color.Black}, image.Point{}, draw.Over)
 	}
 
 	return img
@@ -43,11 +49,13 @@ func createFrame(text string, font *truetype.Font, width, height int) *image.Pal
 
 func main() {
 	var (
-		text     = flag.String("text", "Hello, World!", "Text to animate")
-		output   = flag.String("output", "output.gif", "Output file name")
-		delay    = flag.Int("delay", 10, "Delay between frames (100ths of seconds)")
-		endDelay = flag.Int("end-delay", 30, "Delay after last character (100ths of seconds)")
-		fontPath = flag.String("font", "fonts/NotoSans-Regular.ttf", "Path to font file") // https://github.com/golang/freetype/issues/8
+		text          = flag.String("text", "Hello, World!", "Text to animate")
+		output        = flag.String("output", "output.gif", "Output file name")
+		delay         = flag.Int("delay", 10, "Delay between frames (100ths of seconds)")
+		endDelay      = flag.Int("end-delay", 30, "Delay after last character (100ths of seconds)")
+		initialBlinks = flag.Int("blinks", 3, "Number of cursor blinks before animation")
+		blinkDelay    = flag.Int("blink-delay", 50, "Delay for cursor blinks (100ths of seconds)")
+		fontPath      = flag.String("font", "fonts/Helvetica.ttf", "Path to font file")
 	)
 	flag.Parse()
 
@@ -67,8 +75,16 @@ func main() {
 	var images []*image.Paletted
 	var delays []int
 
+	// Add initial blinking cursor
+	for i := 0; i < *initialBlinks*2; i++ {
+		img := createFrame("", f, width, height, i%2 == 0)
+		images = append(images, img)
+		delays = append(delays, *blinkDelay)
+	}
+
+	// Main text animation
 	for i := 0; i <= len(*text); i++ {
-		img := createFrame((*text)[:i], f, width, height)
+		img := createFrame((*text)[:i], f, width, height, true)
 		images = append(images, img)
 		if i == len(*text) {
 			delays = append(delays, *endDelay)
