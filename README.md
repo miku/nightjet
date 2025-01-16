@@ -38,7 +38,7 @@ Some goals are to
 * [ ] A RAG for catalog metadata
 * [ ] A metadata completion tool (do a fine tune over metadata that is correct and then blank out known fields), maybe relate to the theme of metadata quality
 * [ ] write a pure Go version of wapiti
-* [ ] something like cbonsai, but for palm tree
+* [ ] something like cbonsai, but for palm tree (wip)
 
 ## Models
 
