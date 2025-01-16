@@ -5,12 +5,12 @@ import (
 	"image"
 	"image/color"
 	"image/gif"
+	"io/ioutil"
 	"log"
 	"os"
 
 	"github.com/golang/freetype"
 	"github.com/golang/freetype/truetype"
-	"golang.org/x/image/font/gofont/goregular"
 )
 
 func createFrame(text string, font *truetype.Font, width, height int) *image.Paletted {
@@ -33,9 +33,8 @@ func createFrame(text string, font *truetype.Font, width, height int) *image.Pal
 	pt := freetype.Pt(20, 40)
 	c.DrawString(text, pt)
 
-	// Draw cursor if not at the end
 	if len(text) > 0 {
-		cursorX := 20 + (len(text) * 13) // Approximate character width
+		cursorX := 20 + (len(text) * 13)
 		c.DrawString("|", freetype.Pt(cursorX, 40))
 	}
 
@@ -44,40 +43,46 @@ func createFrame(text string, font *truetype.Font, width, height int) *image.Pal
 
 func main() {
 	var (
-		text   = flag.String("text", "Hello, World!", "Text to animate")
-		output = flag.String("output", "output.gif", "Output file name")
-		delay  = flag.Int("delay", 10, "Delay between frames (100ths of seconds)")
+		text     = flag.String("text", "Hello, World!", "Text to animate")
+		output   = flag.String("output", "output.gif", "Output file name")
+		delay    = flag.Int("delay", 10, "Delay between frames (100ths of seconds)")
+		endDelay = flag.Int("end-delay", 30, "Delay after last character (100ths of seconds)")
+		fontPath = flag.String("font", "fonts/NotoSans-Regular.ttf", "Path to font file") // https://github.com/golang/freetype/issues/8
 	)
 	flag.Parse()
 
-	// Load font
-	f, err := truetype.Parse(goregular.TTF)
+	fontBytes, err := ioutil.ReadFile(*fontPath)
 	if err != nil {
-		log.Fatalf("Error loading font: %v", err)
+		log.Fatalf("Error reading font file: %v", err)
 	}
 
-	// Calculate image dimensions
-	width := 20 + (len(*text) * 15) // Add padding and approximate char width
+	f, err := truetype.Parse(fontBytes)
+	if err != nil {
+		log.Fatalf("Error parsing font: %v", err)
+	}
+
+	width := 20 + (len(*text) * 15)
 	height := 60
 
 	var images []*image.Paletted
 	var delays []int
 
-	// Create frames
 	for i := 0; i <= len(*text); i++ {
 		img := createFrame((*text)[:i], f, width, height)
 		images = append(images, img)
-		delays = append(delays, *delay)
+		if i == len(*text) {
+			delays = append(delays, *endDelay)
+		} else {
+			delays = append(delays, *delay)
+		}
 	}
 
-	// Create output file
 	outFile, err := os.Create(*output)
 	if err != nil {
 		log.Fatalf("Error creating output file: %v", err)
 	}
 	defer outFile.Close()
 
-	// Encode GIF
 	if err := gif.EncodeAll(outFile, &gif.GIF{
 		Image: images,
 		Delay: delays,
