@@ -10,25 +10,40 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/golang/freetype"
 	"github.com/golang/freetype/truetype"
 )
 
+func parseHexColor(hex string) color.Color {
+	hex = strings.TrimPrefix(hex, "#")
+	r, _ := strconv.ParseUint(hex[0:2], 16, 8)
+	g, _ := strconv.ParseUint(hex[2:4], 16, 8)
+	b, _ := strconv.ParseUint(hex[4:6], 16, 8)
+	return color.RGBA{uint8(r), uint8(g), uint8(b), 255}
+}
+
 func measureTextWidth(text string, c *freetype.Context) int {
 	bounds, _ := c.DrawString(text, freetype.Pt(0, 0))
 	return int(bounds.X.Round())
 }
 
-func createFrame(text string, font *truetype.Font, width, height int, showCursor bool, yOffset int) *image.Paletted {
+func createFrame(text string, font *truetype.Font, width, height int, showCursor bool, yOffset int, textColor, bgColor color.Color) *image.Paletted {
+	palette := color.Palette{
+		bgColor,
+		textColor,
+	}
+
 	img := image.NewPaletted(
 		image.Rect(0, 0, width, height),
-		color.Palette{
-			color.White,
-			color.Black,
-		},
+		palette,
 	)
+
+	// Fill background
+	draw.Draw(img, img.Bounds(), &image.Uniform{bgColor}, image.Point{}, draw.Src)
 
 	c := freetype.NewContext()
 	c.SetDPI(72)
@@ -36,7 +51,7 @@ func createFrame(text string, font *truetype.Font, width, height int, showCursor
 	c.SetFontSize(24)
 	c.SetClip(img.Bounds())
 	c.SetDst(img)
-	c.SetSrc(image.Black)
+	c.SetSrc(&image.Uniform{textColor})
 
 	startX := 20
 	baseY := 40
@@ -50,7 +65,7 @@ func createFrame(text string, font *truetype.Font, width, height int, showCursor
 		textWidth := measureTextWidth(text, c)
 		cursorX := startX + textWidth
 		cursor := image.Rect(cursorX, 20+yOffset, cursorX+13, 45+yOffset)
-		draw.Draw(img, cursor, &image.Uniform{color.Black}, image.Point{}, draw.Over)
+		draw.Draw(img, cursor, &image.Uniform{textColor}, image.Point{}, draw.Over)
 	}
 
 	return img
@@ -76,9 +91,14 @@ func main() {
 		initialBlinks = flag.Int("blinks", 3, "Number of cursor blinks before animation")
 		blinkDelay    = flag.Int("blink-delay", 50, "Delay for cursor blinks (100ths of seconds)")
 		jitter        = flag.Int("jitter", 0, "Maximum vertical jitter in pixels")
-		delayJitter   = flag.Int("delay-jitter", 10, "Maximum delay jitter in 100ths of seconds")
+		delayJitter   = flag.Int("delay-jitter", 3, "Maximum delay jitter in 100ths of seconds")
+		textColorHex  = flag.String("text-color", "#FFFFFF", "Text color in hex format (e.g. #FF0000)")
+		bgColorHex    = flag.String("bg-color", "#000000", "Background color in hex format (e.g. #FFFFFF)")
 	)
 	flag.Parse()
+
+	textColor := parseHexColor(*textColorHex)
+	bgColor := parseHexColor(*bgColorHex)
 
 	fontBytes, err := ioutil.ReadFile("fonts/Helvetica.ttf")
 	if err != nil {
@@ -91,20 +111,20 @@ func main() {
 	}
 
 	width := 600
-	height := 70 // Increased to accommodate vertical jitter
+	height := 70
 
 	var images []*image.Paletted
 	var delays []int
 
 	for i := 0; i < *initialBlinks*2; i++ {
-		img := createFrame("", f, width, height, i%2 == 0, 0)
+		img := createFrame("", f, width, height, i%2 == 0, 0, textColor, bgColor)
 		images = append(images, img)
 		delays = append(delays, *blinkDelay)
 	}
 
 	for i := 0; i <= len(*text); i++ {
 		yOffset := randomJitter(*jitter)
-		img := createFrame((*text)[:i], f, width, height, true, yOffset)
+		img := createFrame((*text)[:i], f, width, height, true, yOffset, textColor, bgColor)
 		images = append(images, img)
 
 		if i == len(*text) {
