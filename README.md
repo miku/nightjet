@@ -39,6 +39,9 @@ Some goals are to
 * [ ] A metadata completion tool (do a fine tune over metadata that is correct and then blank out known fields), maybe relate to the theme of metadata quality
 * [ ] write a pure Go version of wapiti
 * [ ] something like cbonsai, but for palm tree (wip)
+* [ ] tailpdf, tool that "reads" (papers) pdfs I download and amends a "RESEARCH.md" document with some finding, highlighted excerpts, maybe responding to a question in the document
+* [ ] a TUI to navigate a large (2B+) graph structure in an intuitive way, like ranger
+* [ ] a website that given a research pdf will find all links and archive them
 
 ## Models
 
@@ -49,6 +52,10 @@ Some goals are to
 
 ## Readings
 
+* [CS224g: Code generation with LLMs](https://web.stanford.edu/class/cs224g/slides/Code%20Generation%20with%20LLMs.pdf)
+* [Google DeepMind: Large Language Models for Code Generation](https://rdi.berkeley.edu/responsible-genai/assets/LLM_codegen_lecture.pdf)
+* [ChatGPT Prompt Patterns for Improving Code Quality, Refactoring, Requirements Elicitation, and Software Design](https://www.dre.vanderbilt.edu/~schmidt/PDF/prompt-patterns-book-chapter.pdf)
+* [Prompt Patterns for Structured Data Extraction from Unstructured Text](https://www.dre.vanderbilt.edu/~schmidt/PDF/Prompt_Patterns_for_Structured_Data_Extraction_from_Unstructured_Text.pdf)
 
 ## Misc
 
