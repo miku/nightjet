@@ -14,6 +14,11 @@ import (
 	"github.com/golang/freetype/truetype"
 )
 
+func measureTextWidth(text string, c *freetype.Context) int {
+	bounds, _ := c.DrawString(text, freetype.Pt(0, 0))
+	return int(bounds.X.Round())
+}
+
 func createFrame(text string, font *truetype.Font, width, height int, showCursor bool) *image.Paletted {
 	img := image.NewPaletted(
 		image.Rect(0, 0, width, height),
@@ -31,15 +36,16 @@ func createFrame(text string, font *truetype.Font, width, height int, showCursor
 	c.SetDst(img)
 	c.SetSrc(image.Black)
 
-	pt := freetype.Pt(20, 40)
-	c.DrawString(text, pt)
+	startX := 20
+	pt := freetype.Pt(startX, 40)
 
-	cursorX := 20
-	if len(text) > 0 {
-		cursorX = 20 + (len(text) * 13)
+	if text != "" {
+		c.DrawString(text, pt)
 	}
 
 	if showCursor {
+		textWidth := measureTextWidth(text, c)
+		cursorX := startX + textWidth
 		cursor := image.Rect(cursorX, 20, cursorX+13, 45)
 		draw.Draw(img, cursor, &image.Uniform{color.Black}, image.Point{}, draw.Over)
 	}
@@ -55,11 +61,10 @@ func main() {
 		endDelay      = flag.Int("end-delay", 30, "Delay after last character (100ths of seconds)")
 		initialBlinks = flag.Int("blinks", 3, "Number of cursor blinks before animation")
 		blinkDelay    = flag.Int("blink-delay", 50, "Delay for cursor blinks (100ths of seconds)")
-		fontPath      = flag.String("font", "fonts/Helvetica.ttf", "Path to font file")
 	)
 	flag.Parse()
 
-	fontBytes, err := ioutil.ReadFile(*fontPath)
+	fontBytes, err := ioutil.ReadFile("fonts/Helvetica.ttf")
 	if err != nil {
 		log.Fatalf("Error reading font file: %v", err)
 	}
@@ -69,20 +74,18 @@ func main() {
 		log.Fatalf("Error parsing font: %v", err)
 	}
 
-	width := 20 + (len(*text) * 15)
+	width := 600 // Fixed width to accommodate various text lengths
 	height := 60
 
 	var images []*image.Paletted
 	var delays []int
 
-	// Add initial blinking cursor
 	for i := 0; i < *initialBlinks*2; i++ {
 		img := createFrame("", f, width, height, i%2 == 0)
 		images = append(images, img)
 		delays = append(delays, *blinkDelay)
 	}
 
-	// Main text animation
 	for i := 0; i <= len(*text); i++ {
 		img := createFrame((*text)[:i], f, width, height, true)
 		images = append(images, img)
