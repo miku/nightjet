@@ -159,9 +159,10 @@ func main() {
 
 	maxWidth := *width - 40
 	var completedLines []Line
-	lineHeight := 30
 	baseY := 40
+	lineHeight := 30
 
+	// Start first line closer to top to avoid artifacts
 	completedLines = append(completedLines, Line{text: "", yPos: baseY})
 
 	var images []*image.Paletted
@@ -174,23 +175,28 @@ func main() {
 		delays = append(delays, *blinkDelay)
 	}
 
-	// Text animation
 	currentText := ""
 	for pos, char := range *text {
 		currentText += string(char)
 		textWidth := measureTextWidth(currentText, c)
 
 		if textWidth > maxWidth || char == '\n' {
-			completedLines[len(completedLines)-1].text = strings.TrimSpace(currentText[:len(currentText)-1])
+			if len(completedLines) > 0 {
+				completedLines[len(completedLines)-1].text = strings.TrimSpace(currentText[:len(currentText)-1])
+			}
 			currentText = string(char)
 			if char == '\n' {
 				currentText = ""
 			}
 
-			// Shift lines up if needed
-			if len(completedLines)*lineHeight > *height-lineHeight {
+			// Adjust line positions when scrolling
+			if (len(completedLines)+1)*lineHeight > *height-lineHeight {
 				for i := range completedLines {
 					completedLines[i].yPos -= lineHeight
+				}
+				// Remove lines that have scrolled completely out of view
+				for len(completedLines) > 0 && completedLines[0].yPos < 0 {
+					completedLines = completedLines[1:]
 				}
 			}
 
@@ -208,8 +214,7 @@ func main() {
 		}
 	}
 
-	// Add final line if needed
-	if currentText != "" {
+	if currentText != "" && len(completedLines) > 0 {
 		completedLines[len(completedLines)-1].text = currentText
 	}
 
