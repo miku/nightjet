@@ -8,7 +8,9 @@ import (
 	"image/gif"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"os"
+	"time"
 
 	"github.com/golang/freetype"
 	"github.com/golang/freetype/truetype"
@@ -19,7 +21,7 @@ func measureTextWidth(text string, c *freetype.Context) int {
 	return int(bounds.X.Round())
 }
 
-func createFrame(text string, font *truetype.Font, width, height int, showCursor bool) *image.Paletted {
+func createFrame(text string, font *truetype.Font, width, height int, showCursor bool, yOffset int) *image.Paletted {
 	img := image.NewPaletted(
 		image.Rect(0, 0, width, height),
 		color.Palette{
@@ -37,7 +39,8 @@ func createFrame(text string, font *truetype.Font, width, height int, showCursor
 	c.SetSrc(image.Black)
 
 	startX := 20
-	pt := freetype.Pt(startX, 40)
+	baseY := 40
+	pt := freetype.Pt(startX, baseY+yOffset)
 
 	if text != "" {
 		c.DrawString(text, pt)
@@ -46,21 +49,34 @@ func createFrame(text string, font *truetype.Font, width, height int, showCursor
 	if showCursor {
 		textWidth := measureTextWidth(text, c)
 		cursorX := startX + textWidth
-		cursor := image.Rect(cursorX, 20, cursorX+13, 45)
+		cursor := image.Rect(cursorX, 20+yOffset, cursorX+13, 45+yOffset)
 		draw.Draw(img, cursor, &image.Uniform{color.Black}, image.Point{}, draw.Over)
 	}
 
 	return img
 }
 
+func randomJitter(maxJitter int) int {
+	return rand.Intn(maxJitter*2+1) - maxJitter
+}
+
+func randomDelay(baseDelay int, jitterMs int) int {
+	jitter := rand.Intn(jitterMs*2+1) - jitterMs
+	return baseDelay + jitter
+}
+
 func main() {
+	rand.Seed(time.Now().UnixNano())
+
 	var (
 		text          = flag.String("text", "Hello, World!", "Text to animate")
 		output        = flag.String("output", "output.gif", "Output file name")
-		delay         = flag.Int("delay", 10, "Delay between frames (100ths of seconds)")
+		delay         = flag.Int("delay", 10, "Base delay between frames (100ths of seconds)")
 		endDelay      = flag.Int("end-delay", 30, "Delay after last character (100ths of seconds)")
 		initialBlinks = flag.Int("blinks", 3, "Number of cursor blinks before animation")
 		blinkDelay    = flag.Int("blink-delay", 50, "Delay for cursor blinks (100ths of seconds)")
+		jitter        = flag.Int("jitter", 0, "Maximum vertical jitter in pixels")
+		delayJitter   = flag.Int("delay-jitter", 10, "Maximum delay jitter in 100ths of seconds")
 	)
 	flag.Parse()
 
@@ -74,25 +90,27 @@ func main() {
 		log.Fatalf("Error parsing font: %v", err)
 	}
 
-	width := 600 // Fixed width to accommodate various text lengths
-	height := 60
+	width := 600
+	height := 70 // Increased to accommodate vertical jitter
 
 	var images []*image.Paletted
 	var delays []int
 
 	for i := 0; i < *initialBlinks*2; i++ {
-		img := createFrame("", f, width, height, i%2 == 0)
+		img := createFrame("", f, width, height, i%2 == 0, 0)
 		images = append(images, img)
 		delays = append(delays, *blinkDelay)
 	}
 
 	for i := 0; i <= len(*text); i++ {
-		img := createFrame((*text)[:i], f, width, height, true)
+		yOffset := randomJitter(*jitter)
+		img := createFrame((*text)[:i], f, width, height, true, yOffset)
 		images = append(images, img)
+
 		if i == len(*text) {
 			delays = append(delays, *endDelay)
 		} else {
-			delays = append(delays, *delay)
+			delays = append(delays, randomDelay(*delay, *delayJitter))
 		}
 	}
 
