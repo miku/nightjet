@@ -16,6 +16,10 @@ Some goals are to
 
 ![Notebook with random colors](x/nb/notebook.webp)
 
+* [x] basic text to gif
+
+![](x/textgif1/output.gif)
+
 ## TODO
 
 * [ ] a TUI for language learning, drill, not too fancy, with some gaming aspect
