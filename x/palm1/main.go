@@ -4,37 +4,43 @@ import (
 	"fmt"
 	"math/rand"
 	"time"
-
-	"github.com/fatih/color"
 )
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
 
-	// Define colors
-	green := color.New(color.FgGreen).SprintFunc()
-	brown := color.New(color.FgYellow).SprintFunc() // Using yellow for brown-ish
-	coconut := color.New(color.FgWhite).SprintFunc()
-
-	// Randomize leaf shape slightly
-	leafTop := []string{".~~.", ".~.~", ".~~~"}
-	leafMid := []string{"/~~~\\", "/~ ~\\", "/~~~~"}
-	leafBottom := []string{"\\~~~/", "\\~ ~/", "\\~~~~"}
-	leafIndex := rand.Intn(3)
-	fmt.Println("     " + green(leafTop[leafIndex]))
-	fmt.Println("    " + green(leafMid[leafIndex]))
-	fmt.Println("   |     |")
-	fmt.Println("   " + green(leafBottom[leafIndex]))
-	fmt.Println("    `~~'")
-
-	// Trunk height variation
-	trunkHeight := rand.Intn(3) + 3 // Trunk length between 3 and 5
-
-	for i := 0; i < trunkHeight; i++ {
-		fmt.Println("      " + brown("||"))
+	// Function to generate a shade of green using ANSI escape codes
+	greenShade := func() string {
+		r := 0
+		g := rand.Intn(156) + 100 // Green values between 100 and 255
+		b := 0
+		return fmt.Sprintf("\033[38;2;%d;%d;%dm█\033[0m", r, g, b)
 	}
 
-	fmt.Println(" --------")
-	fmt.Println("| " + coconut("O") + "    " + coconut("O") + " |")
-	fmt.Println("|________|")
+	// Trunk height
+	trunkHeight := rand.Intn(3) + 4
+
+	// Draw trunk
+	for i := 0; i < trunkHeight; i++ {
+		fmt.Println("     │")
+	}
+
+	// Draw leaves
+	leafWidth := rand.Intn(6) + 7 // Odd numbers for centered leaves
+	for i := 0; i < 3; i++ {      // 3 rows of leaves
+		padding := (leafWidth - 1) / 2
+		for j := 0; j < padding; j++ {
+			fmt.Print(" ")
+		}
+		for j := 0; j < 1; j++ {
+			fmt.Print(greenShade())
+		}
+		for j := 0; j < leafWidth-2; j++ {
+			fmt.Print(greenShade())
+		}
+		for j := 0; j < 1; j++ {
+			fmt.Print(greenShade())
+		}
+		fmt.Println()
+	}
 }
