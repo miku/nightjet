@@ -60,10 +60,10 @@ Some goals are to
 * [Google DeepMind: Large Language Models for Code Generation](https://rdi.berkeley.edu/responsible-genai/assets/LLM_codegen_lecture.pdf)
 * [ChatGPT Prompt Patterns for Improving Code Quality, Refactoring, Requirements Elicitation, and Software Design](https://www.dre.vanderbilt.edu/~schmidt/PDF/prompt-patterns-book-chapter.pdf)
 * [Prompt Patterns for Structured Data Extraction from Unstructured Text](https://www.dre.vanderbilt.edu/~schmidt/PDF/Prompt_Patterns_for_Structured_Data_Extraction_from_Unstructured_Text.pdf)
+* [Foundations of Large Language Models](https://arxiv.org/pdf/2501.09223)
 
 ## Misc
 
 * [Everything I built with Claude Artifacts this week](https://simonwillison.net/2024/Oct/21/claude-artifacts/)
 * [How I program with LLMs](https://crawshaw.io/blog/programming-with-llms)
-
 
