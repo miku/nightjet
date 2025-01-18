@@ -17,7 +17,7 @@ Some goals are to
 ![Notebook with random colors](x/nb/notebook.webp)
 
 * [x] basic text to [gif](x/textgif1/output.gif)
-* [x] trcli, a quick trello cli for listing cards on a board plus summary (x/trcli/trcli.gif)
+* [x] trcli, a quick trello cli for listing cards on a board plus summary [demo](x/trcli/trcli.gif)
 
 ## TODO
 
