@@ -46,6 +46,7 @@ Some goals are to
 * [ ] a TUI to navigate a large (2B+) graph structure in an intuitive way, like ranger
 * [ ] a website that given a research pdf will find all links and archive them
 * [ ] a data format conversion tool, mapping source to target schema by examples
+* [ ] grepcity, grep through random pics
 
 ## Models
 
