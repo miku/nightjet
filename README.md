@@ -51,6 +51,7 @@ Some goals are to
 ## Models
 
 * [Codestral](https://ollama.com/library/codestral:22b), via [Chat AI](https://arxiv.org/abs/2407.00110)
+* [DeepSeek-R1-Distill-Llama-8B](https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Llama-8B), via [blablador](https://helmholtz-blablador.fz-juelich.de/)
 * [Claude](https://en.wikipedia.org/wiki/Claude_(language_model))
 * [Gemini](https://gemini.google.com)
 * [Chatgpt](https://chatgpt.com)
