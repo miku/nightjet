@@ -48,6 +48,7 @@ Some goals are to
 * [ ] a data format conversion tool, mapping source to target schema by examples
 * [ ] grepcity, grep through random pics
 
+
 ## Models
 
 * [Codestral](https://ollama.com/library/codestral:22b), via [Chat AI](https://arxiv.org/abs/2407.00110)
