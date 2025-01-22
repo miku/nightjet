@@ -47,6 +47,7 @@ Some goals are to
 * [ ] a website that given a research pdf will find all links and archive them
 * [ ] a data format conversion tool, mapping source to target schema by examples
 * [ ] grepcity, grep through random pics
+* [ ] maze generation
 
 
 ## Models
