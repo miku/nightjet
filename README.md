@@ -50,6 +50,7 @@ Some goals are to
 * [ ] maze generation
 * [ ] cloud library, spreadsheet as a catalog
 * [ ] email drafter with n8n
+* [ ] bookdna, cli
 
 
 ## Models
