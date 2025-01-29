@@ -51,6 +51,7 @@ Some goals are to
 * [ ] cloud library, spreadsheet as a catalog
 * [ ] email drafter with n8n
 * [ ] bookdna, cli
+* [ ] DLFQ
 
 
 ## Models
