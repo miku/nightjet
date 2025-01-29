@@ -26,7 +26,7 @@ Some goals are to
 * [ ] a TUI for learning the N most used chinese characters, or hangul, or kanji
 * [ ] a simple desktop application that revolves around the "TAFELWERK" - learn about a topic, or solve some questions with a builtin equation editor
 * [ ] a CLI for exploring a text corpus of a foreign language, ranking sentences by difficulty, automatic translation
-* [ ] an simple "appointment scheduler for hackers", with webpage and CLI first approach, "cali"
+* [ ] an simple "appointment scheduler for hackers", with webpage and CLI first approach, "[cali](https://github.com/miku/cali)"
 * [ ] a reprise on norvig UNIX help system article from 2001: https://research.google/pubs/intelligent-help-systems-for-unix/
 * [ ] a TUI that allow to navigate a citation graph in some cool way
 * [ ] a set of psychometric tests for the command line (similar to canny)
