@@ -52,6 +52,7 @@ Some goals are to
 * [ ] email drafter with n8n
 * [ ] bookdna, cli
 * [ ] DLFQ
+* [ ] fasttext, research classifier
 
 
 ## Models
