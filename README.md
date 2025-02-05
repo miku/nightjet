@@ -53,6 +53,7 @@ Some goals are to
 * [ ] bookdna, cli
 * [ ] DLFQ
 * [ ] fasttext, research classifier
+* [ ] tab, chord, game, tui
 
 
 ## Models
