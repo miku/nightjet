@@ -54,6 +54,7 @@ Some goals are to
 * [ ] DLFQ
 * [ ] fasttext, research classifier
 * [ ] tab, chord, game, tui
+* [ ] port of [replace](https://github.com/MariaDB/server/blob/3883eb63dc5e663558571c33d086c9fd3aa0cf8f/extra/replace.c) to go
 
 
 ## Models
