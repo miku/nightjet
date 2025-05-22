@@ -28,18 +28,13 @@ Testing various open models.
 | 🇨🇳 Alibaba Cloud               | Qwen 2.5 72B Instruct               | yes  | Sep 2024         | 128k                     | Good overall performance, multilingual, global affairs, logic     | -                          | default, temp=0.2, top_p=0.1            |
 | 🇨🇳 Alibaba Cloud               | Qwen 2.5 VL 72B Instruct            | yes  | Sep 2024         | 90k                      | Vision, multilingual                                              | -                          | default                                 |
 | 🇨🇳 Alibaba Cloud               | Qwen 2.5 Coder 32B Instruct         | yes  | Sep 2024         | 128k                     | Coding tasks                                                      | -                          | default, temp=0.2, top_p=0.1            |
-| 🇺🇸 OpenAI                      | GPT-4.1                             | no   | June 2024        | 1M                       | Great overall performance                                         | -                          | default                                 |
-| 🇺🇸 OpenAI                      | GPT-4.1 Mini                        | no   | June 2024        | 1M                       | Fast overall performance                                          | -                          | default                                  |
-| 🇺🇸 OpenAI                      | o1                                  | no   | Oct 2023         | 128k                     | Good overall performance, reasoning                               | no streaming               | default                                 |
-| 🇺🇸 OpenAI                      | o1-mini                             | no   | Oct 2023         | 128k                     | Fast overall performance, reasoning                               | no streaming               | default                                 |
-| 🇺🇸 OpenAI                      | GPT-4o                              | no   | Oct 2023         | 128k                     | Good overall performance, vision                                  | -                          | default                                 |
-| 🇺🇸 OpenAI                      | GPT-4o Mini                         | no   | Oct 2023         | 128k                     | Fast overall performance, vision                                  | -                          | default                                 |
-
 
 * prompt engineering is really model training (or "[in-context learning](https://arxiv.org/pdf/2301.00234)"), it
   just does not necessary feel that way
 
-> It has been a significant trend to explore ICL to evaluate and extrapolate the ability of LLMs. [A Survey on In-context Learning](https://arxiv.org/pdf/2301.00234) (2024)
+> It has been a significant trend to explore ICL to evaluate and extrapolate
+> the ability of LLMs. [A Survey on In-context
+> Learning](https://arxiv.org/pdf/2301.00234) (2024)
 
 ## TL;DR
 
@@ -59,4 +54,27 @@ Wanted to have a CLI tool for accessing TRELLO board and printing out.
 * can I get a palm tree into my terminal?
 
 Short answer: NO!
+
+## metha refactoring
+
+* command line harvester for XML data; wanted zstd support
+* codebase existing and familiar
+* overall useful, somewhat easier to review code; need backwards compatibilty and one function needed more parameters
+
+The LLM suggested compression level, but I really did not care about that.
+
+```go
+// Helper to add the appropriate extension based on compression type
+func compressedFilename(base string, compressionType CompressionType) string {
+        switch compressionType {
+        case CompZstd:
+                return base + ".zst"
+        default:
+                return base + ".gz"
+        }
+}
+```
+
+XXX: diff size
+
 
