@@ -60,6 +60,7 @@ Short answer: NO!
 * command line harvester for XML data; wanted zstd support
 * codebase existing and familiar
 * overall useful, somewhat easier to review code; need backwards compatibilty and one function needed more parameters
+* 181 SLOC of migration script; to port existing cache from gzip to zstd; one-time, low risk operation (it is only a cache; saved bandwidth); required additional review for special case
 
 The LLM suggested compression level, but I really did not care about that.
 
@@ -75,6 +76,16 @@ func compressedFilename(base string, compressionType CompressionType) string {
 }
 ```
 
-XXX: diff size
+Changed less than 100 SLOC.
+
+
+```
+$ git diff --stat 0a5555b4 -- harvest.go client.go cmd/metha-sync/main.go
+ client.go  | 27 ++++++++++++++++++++++++---
+ harvest.go | 40 ++++++++++++++++++++++++++++++++++++----
+ 2 files changed, 60 insertions(+), 7 deletions(-)
+```
+
+
 
 
