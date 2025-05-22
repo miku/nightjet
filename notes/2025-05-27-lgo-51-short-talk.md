@@ -39,6 +39,8 @@ Testing various open models.
 * prompt engineering is really model training (or "[in-context learning](https://arxiv.org/pdf/2301.00234)"), it
   just does not necessary feel that way
 
+> It has been a significant trend to explore ICL to evaluate and extrapolate the ability of LLMs. [A Survey on In-context Learning](https://arxiv.org/pdf/2301.00234) (2024)
+
 ## TL;DR
 
 * so far, both: HITS and MISSES
