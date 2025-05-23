@@ -64,12 +64,12 @@ func TestCalculateEffectiveLength(t *testing.T) {
 		expected int
 	}{
 		{"hello", 5},
-		{"\\bhello\\b", 7},    // \b + h + e + l + l + o + \b
-		{"\\^start", 6},       // \^ + s + t + a + r + t
-		{"end\\$", 4},         // e + n + d + \$
-		{"\\t\\r\\n", 3},      // \t + \r + \n
-		{"a\\\\b", 3},         // a + \\ + b
-		{"\\btest\\bmore", 9}, // \b + t + e + s + t + \b + m + o + r + e
+		{"\\bhello\\b", 7},     // \b + h + e + l + l + o + \b
+		{"\\^start", 6},        // \^ + s + t + a + r + t
+		{"end\\$", 4},          // e + n + d + \$
+		{"\\t\\r\\n", 3},       // \t + \r + \n
+		{"a\\\\b", 3},          // a + \\ + b
+		{"\\btest\\bmore", 10}, // \b + t + e + s + t + \b + m + o + r + e
 		{"", 0},
 	}
 
