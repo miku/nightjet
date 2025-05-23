@@ -1,8 +1,8 @@
 GO_FILES = $(shell find . -name "*.go" -type f)
 SHELL = /bin/bash
 
-main: main.go
-	go build -o main main.go bitset.go pattern.go dfa.go replace.go
+greplace: $(GO_FILES)
+	go build -o greplace greplace.go bitset.go pattern.go dfa.go replace.go
 
 .PHONY: test
 test:
