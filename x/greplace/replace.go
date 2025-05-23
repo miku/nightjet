@@ -34,8 +34,8 @@ func (re *ReplacementEngine) ReplaceString(input string) (string, bool, error) {
 	pos := 0
 
 	for pos < len(inputBytes) {
-		// Run the DFA starting from current position
-		matchLen, replacement, err := re.findMatch(inputBytes, pos)
+		// Try to find a match starting at current position
+		matchLen, replacement, err := re.findMatchFixed(inputBytes, pos)
 		if err != nil {
 			return "", false, err
 		}
@@ -110,6 +110,112 @@ func (re *ReplacementEngine) findMatch(input []byte, startPos int) (int, string,
 	}
 
 	return bestLength, bestMatch, nil
+}
+
+// findMatchFixed - a simpler, more direct approach to finding matches
+func (re *ReplacementEngine) findMatchFixed(input []byte, startPos int) (int, string, error) {
+	if startPos >= len(input) {
+		return 0, "", nil
+	}
+
+	// Simple brute force approach for now to verify the patterns work
+	// We'll optimize this later once we confirm the basic logic works
+	patterns := re.patterns.GetPatterns()
+
+	bestLength := 0
+	bestReplacement := ""
+
+	// Try each pattern at the current position
+	for _, pattern := range patterns {
+		if re.matchesAt(input, startPos, pattern.From) {
+			if len(pattern.From) > bestLength {
+				bestLength = len(pattern.From)
+				bestReplacement = pattern.To
+			}
+		}
+	}
+
+	return bestLength, bestReplacement, nil
+}
+
+// SimpleDFAReplacementEngine - let's also create a working DFA version
+func (re *ReplacementEngine) findMatchDFA(input []byte, startPos int) (int, string, error) {
+	if startPos >= len(input) {
+		return 0, "", nil
+	}
+
+	currentState := 0 // Start with state 0
+	pos := startPos
+	bestMatch := ""
+	bestLength := 0
+
+	// Run the DFA
+	for pos <= len(input) && currentState >= 0 && currentState < len(re.dfa) {
+		// Check if current state is a final state
+		state := &re.dfa[currentState]
+		if state.PatternIndex >= 0 {
+			// This is a final state - we found a match
+			matchLength := pos - startPos
+			if matchLength > bestLength {
+				bestMatch = state.ReplaceString
+				bestLength = matchLength
+			}
+		}
+
+		// If we're at the end of input, break
+		if pos >= len(input) {
+			break
+		}
+
+		// Get the next character
+		inputChar := int(input[pos])
+
+		// Get next state
+		nextState := state.Next[inputChar]
+
+		// Handle different types of next states
+		if nextState == -1 {
+			// No transition - end of matching
+			break
+		} else if nextState < -1 {
+			// This indicates a final state reference
+			finalStateIndex := -(nextState + 2)
+			if finalStateIndex >= 0 && finalStateIndex < len(re.dfa) {
+				// Found a final state
+				finalState := &re.dfa[finalStateIndex]
+				if finalState.PatternIndex >= 0 {
+					matchLength := pos - startPos + 1
+					if matchLength > bestLength {
+						bestMatch = finalState.ReplaceString
+						bestLength = matchLength
+					}
+				}
+			}
+			break
+		} else {
+			// Normal state transition
+			currentState = nextState
+		}
+
+		pos++
+	}
+
+	return bestLength, bestMatch, nil
+}
+
+// matchesAt checks if a pattern matches at a specific position
+func (re *ReplacementEngine) matchesAt(input []byte, pos int, pattern string) bool {
+	if pos+len(pattern) > len(input) {
+		return false
+	}
+
+	for i, char := range []byte(pattern) {
+		if input[pos+i] != char {
+			return false
+		}
+	}
+
+	return true
 }
 
 // getNextState returns the next state for given current state and input character
