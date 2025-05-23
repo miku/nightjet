@@ -283,7 +283,7 @@ func (re *ReplacementEngine) ReplaceReader(reader io.Reader, writer io.Writer) (
 
 // ReplaceInPlace performs replacement on a string slice, modifying it in place
 func (re *ReplacementEngine) ReplaceInPlace(lines []string) (bool, error) {
-	re.updated = false
+	anyUpdated := false
 
 	for i, line := range lines {
 		result, updated, err := re.ReplaceString(line)
@@ -293,11 +293,12 @@ func (re *ReplacementEngine) ReplaceInPlace(lines []string) (bool, error) {
 
 		if updated {
 			lines[i] = result
-			re.updated = true
+			anyUpdated = true
 		}
 	}
 
-	return re.updated, nil
+	re.updated = anyUpdated
+	return anyUpdated, nil
 }
 
 // WasUpdated returns true if the last operation made any replacements
