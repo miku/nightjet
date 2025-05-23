@@ -112,14 +112,12 @@ func (re *ReplacementEngine) findMatch(input []byte, startPos int) (int, string,
 	return bestLength, bestMatch, nil
 }
 
-// findMatchFixed - a simpler, more direct approach to finding matches
 func (re *ReplacementEngine) findMatchFixed(input []byte, startPos int) (int, string, error) {
 	if startPos >= len(input) {
 		return 0, "", nil
 	}
 
 	// Simple brute force approach for now to verify the patterns work
-	// We'll optimize this later once we confirm the basic logic works
 	patterns := re.patterns.GetPatterns()
 
 	bestLength := 0
@@ -203,7 +201,7 @@ func (re *ReplacementEngine) findMatchDFA(input []byte, startPos int) (int, stri
 	return bestLength, bestMatch, nil
 }
 
-// matchesAt checks if a pattern matches at a specific position
+// Add this helper method
 func (re *ReplacementEngine) matchesAt(input []byte, pos int, pattern string) bool {
 	if pos+len(pattern) > len(input) {
 		return false
