@@ -87,18 +87,15 @@ func TestBitSetBoundaryConditions(t *testing.T) {
 
 func TestBitSetNextBit(t *testing.T) {
 	bs := NewBitSet(100)
-
 	// Empty bitset should return -1
 	if pos := bs.NextBit(-1); pos != -1 {
 		t.Errorf("empty bitset NextBit(-1) should return -1, got %d", pos)
 	}
-
 	// Set some bits: 5, 10, 64, 95
 	testBits := []int{5, 10, 64, 95}
 	for _, bit := range testBits {
 		bs.Set(bit)
 	}
-
 	// Test iteration through all set bits
 	var found []int
 	pos := -1
@@ -109,28 +106,23 @@ func TestBitSetNextBit(t *testing.T) {
 		}
 		found = append(found, pos)
 	}
-
 	if len(found) != len(testBits) {
 		t.Errorf("expected %d bits, found %d: %v", len(testBits), len(found), found)
 	}
-
 	for i, expected := range testBits {
 		if i >= len(found) || found[i] != expected {
 			t.Errorf("expected bit %d at position %d, got %v", expected, i, found)
 		}
 	}
-
 	// Test starting from specific positions
 	pos = bs.NextBit(7) // Should find 10
 	if pos != 10 {
 		t.Errorf("NextBit(7) should return 10, got %d", pos)
 	}
-
 	pos = bs.NextBit(10) // Should find 64
 	if pos != 64 {
 		t.Errorf("NextBit(10) should return 64, got %d", pos)
 	}
-
 	pos = bs.NextBit(95) // Should return -1 (no more bits)
 	if pos != -1 {
 		t.Errorf("NextBit(95) should return -1, got %d", pos)
@@ -200,29 +192,24 @@ func TestBitSetOr(t *testing.T) {
 func TestBitSetEqual(t *testing.T) {
 	bs1 := NewBitSet(100)
 	bs2 := NewBitSet(100)
-
 	// Empty bitsets should be equal
 	if !bs1.Equal(bs2) {
 		t.Error("empty bitsets should be equal")
 	}
-
 	// Set same bits
 	testBits := []int{5, 10, 64, 95}
 	for _, bit := range testBits {
 		bs1.Set(bit)
 		bs2.Set(bit)
 	}
-
 	if !bs1.Equal(bs2) {
 		t.Error("Bitsets with same bits should be equal")
 	}
-
 	// Set different bit in bs2
 	bs2.Set(50)
 	if bs1.Equal(bs2) {
 		t.Error("Bitsets with different bits should not be equal")
 	}
-
 	// Different sizes should not be equal
 	bs3 := NewBitSet(50)
 	for _, bit := range testBits {
@@ -237,20 +224,17 @@ func TestBitSetEqual(t *testing.T) {
 
 func TestBitSetWordBoundaries(t *testing.T) {
 	bs := NewBitSet(200)
-
 	// Test bits around word boundaries (64-bit boundaries)
 	boundaryBits := []int{62, 63, 64, 65, 126, 127, 128, 129}
 	for _, bit := range boundaryBits {
 		bs.Set(bit)
 	}
-
 	// Verify all boundary bits are set
 	for _, bit := range boundaryBits {
 		if !bs.IsSet(bit) {
 			t.Errorf("Boundary bit %d should be set", bit)
 		}
 	}
-
 	// Test NextBit across word boundaries
 	var found []int
 	pos := -1
@@ -261,11 +245,9 @@ func TestBitSetWordBoundaries(t *testing.T) {
 		}
 		found = append(found, pos)
 	}
-
 	if len(found) != len(boundaryBits) {
 		t.Errorf("Expected %d boundary bits, found %d: %v", len(boundaryBits), len(found), found)
 	}
-
 	for i, expected := range boundaryBits {
 		if i >= len(found) || found[i] != expected {
 			t.Errorf("Expected boundary bit %d at position %d, got %v", expected, i, found)
