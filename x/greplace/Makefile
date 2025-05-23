@@ -2,7 +2,11 @@ GO_FILES = $(shell find . -name "*.go" -type f)
 SHELL = /bin/bash
 
 main: main.go
-	go build -o main main.go bitset.go
+	go build -o main main.go bitset.go pattern.go
+
+.PHONY: test
+test:
+	go test -cover -v .
 
 .PHONY: clean
 clean:
