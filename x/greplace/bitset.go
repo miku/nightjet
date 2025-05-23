@@ -62,17 +62,15 @@ func (bs *BitSet) NextBit(lastPos int) int {
 	if pos >= bs.Length {
 		return -1
 	}
-
-	wordIndex := pos / 64
-	bitIndex := pos % 64
-
+	var (
+		wordIndex = pos / 64
+		bitIndex  = pos % 64
+	)
 	if wordIndex >= len(bs.Bits) {
 		return -1
 	}
-
 	// Mask off bits we don't want in the current word
 	word := bs.Bits[wordIndex] & (^uint64(0) << bitIndex)
-
 	for {
 		if word != 0 {
 			// Find the first set bit in this word
@@ -85,14 +83,12 @@ func (bs *BitSet) NextBit(lastPos int) int {
 				return bitPos
 			}
 		}
-
 		wordIndex++
 		if wordIndex >= len(bs.Bits) {
 			break
 		}
 		word = bs.Bits[wordIndex]
 	}
-
 	return -1
 }
 
@@ -101,7 +97,6 @@ func (bs *BitSet) Equal(other *BitSet) bool {
 	if bs.Length != other.Length {
 		return false
 	}
-
 	words := (bs.Length + 63) / 64
 	for i := 0; i < words; i++ {
 		if i < len(bs.Bits) && i < len(other.Bits) {
@@ -114,6 +109,5 @@ func (bs *BitSet) Equal(other *BitSet) bool {
 			return false
 		}
 	}
-
 	return true
 }

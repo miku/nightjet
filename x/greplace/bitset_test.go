@@ -30,14 +30,12 @@ func TestNewBitSet(t *testing.T) {
 
 func TestBitSetBasicOperations(t *testing.T) {
 	bs := NewBitSet(100)
-
 	// Initially all bits should be clear
 	for i := 0; i < 100; i++ {
 		if bs.IsSet(i) {
 			t.Errorf("bit %d should be clear initially", i)
 		}
 	}
-
 	// Set some bits
 	testBits := []int{0, 1, 7, 31, 32, 63, 64, 99}
 	for _, bit := range testBits {
@@ -46,7 +44,6 @@ func TestBitSetBasicOperations(t *testing.T) {
 			t.Errorf("bit %d should be set after Set()", bit)
 		}
 	}
-
 	// Clear some bits
 	clearBits := []int{1, 32, 99}
 	for _, bit := range clearBits {
@@ -55,7 +52,6 @@ func TestBitSetBasicOperations(t *testing.T) {
 			t.Errorf("bit %d should be clear after Clear()", bit)
 		}
 	}
-
 	// Verify remaining bits are still set
 	expectedSet := []int{0, 7, 31, 63, 64}
 	for _, bit := range expectedSet {
@@ -67,16 +63,13 @@ func TestBitSetBasicOperations(t *testing.T) {
 
 func TestBitSetBoundaryConditions(t *testing.T) {
 	bs := NewBitSet(64)
-
 	// Test out of bounds access - should not panic
 	bs.Set(-1)   // should be ignored
 	bs.Set(64)   // should be ignored
 	bs.Set(1000) // should be ignored
-
 	if bs.IsSet(-1) || bs.IsSet(64) || bs.IsSet(1000) {
 		t.Error("out of bounds bits should return false")
 	}
-
 	// Test boundary bits
 	bs.Set(0)
 	bs.Set(63)
@@ -141,14 +134,12 @@ func TestBitSetCopy(t *testing.T) {
 	if bs2.Length != bs1.Length {
 		t.Errorf("after copy, length should be %d, got %d", bs1.Length, bs2.Length)
 	}
-
 	// Check that all bits match
 	for i := 0; i < bs1.Length; i++ {
 		if bs1.IsSet(i) != bs2.IsSet(i) {
 			t.Errorf("Bit %d differs after copy: bs1=%v, bs2=%v", i, bs1.IsSet(i), bs2.IsSet(i))
 		}
 	}
-
 	// Modifying bs2 should not affect bs1
 	bs2.Set(10)
 	if bs1.IsSet(10) {
@@ -173,7 +164,6 @@ func TestBitSetOr(t *testing.T) {
 			t.Errorf("bit %d should be set after OR operation", bit)
 		}
 	}
-
 	// Check that no unexpected bits are set
 	count := 0
 	pos := -1
