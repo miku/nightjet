@@ -144,9 +144,11 @@ func (pp *PatternProcessor) startsAtWord(pattern string) bool {
 // endsAtWord checks if pattern ends with word boundary (\b or \$)
 func (pp *PatternProcessor) endsAtWord(pattern string) bool {
 	if len(pattern) >= 2 {
-		if pattern[len(pattern)-2] == '\\' &&
-			(pattern[len(pattern)-1] == 'b' || pattern[len(pattern)-1] == '$') {
-			return true
+		lastChar := pattern[len(pattern)-1]
+		secondLastChar := pattern[len(pattern)-2]
+		if secondLastChar == '\\' && (lastChar == 'b' || lastChar == '$') {
+			// Check if there's content before the boundary marker
+			return len(pattern) > 2
 		}
 	}
 	return false
