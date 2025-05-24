@@ -12,7 +12,7 @@ test:
 clean:
 	rm -f greplace
 
-digest.txt: $(GO_FILES)
-	uvx gitingest -o digest.txt
+digest.txt: $(GO_FILES) Makefile
+	uvx gitingest -o digest.txt -e testdata
 
 
