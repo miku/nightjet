@@ -1,7 +1,6 @@
 package main
 
 import (
-	// For bytes.Compare, similar to memcmp
 	"fmt"
 	"log"
 	"os"
@@ -96,8 +95,7 @@ var (
 	foundSets uint = 0
 )
 
-// --- Functions related to PointerArray (from previous step) ---
-
+// --- Functions related to PointerArray ---
 func (pa *PointerArray) insertPointerName(name string) error {
 	if pa.Typelib.Count == 0 {
 		initialCapacity := PcMalloc / (8 + 1)
@@ -170,114 +168,209 @@ func (pa *PointerArray) freePointerArray() {
 }
 
 // --- Bit Manipulation Functions (Methods on *RepSet) ---
-
-// internalSetBit translates C's `internal_set_bit`.
-// Sets the specified bit in the RepSet's bitset.
 func (rs *RepSet) internalSetBit(bit uint) {
-	// `set->bits[bit / WORD_BIT] |= 1 << (bit % WORD_BIT);`
 	rs.Bits[bit/WordBit] |= (1 << (bit % WordBit))
 }
 
-// internalClearBit translates C's `internal_clear_bit`.
-// Clears the specified bit in the RepSet's bitset.
 func (rs *RepSet) internalClearBit(bit uint) {
-	// `set->bits[bit / WORD_BIT] &= ~ (1 << (bit % WORD_BIT));`
-	rs.Bits[bit/WordBit] &^= (1 << (bit % WordBit)) // `&^=` is Go's bit clear operator
+	rs.Bits[bit/WordBit] &^= (1 << (bit % WordBit))
 }
 
-// orBits translates C's `or_bits`.
-// Performs a bitwise OR operation from `from` RepSet's bits into `to` RepSet's bits.
 func (to *RepSet) orBits(from *RepSet) {
-	// `to->size_of_bits` and `from->size_of_bits` should be the same.
-	// We'll iterate up to `to.SizeOfBits`.
 	for i := uint(0); i < to.SizeOfBits; i++ {
 		to.Bits[i] |= from.Bits[i]
 	}
 }
 
-// copyBits translates C's `copy_bits`.
-// Copies the bitset from `from` RepSet to `to` RepSet.
 func (to *RepSet) copyBits(from *RepSet) {
-	// `memcpy((uchar*) to->bits,(uchar*) from->bits, (size_t) (sizeof(uint) * to->size_of_bits));`
-	// In Go, simply use the `copy` built-in function for slices.
-	// Make sure `to.Bits` has enough capacity/length.
 	copy(to.Bits, from.Bits)
 }
 
-// cmpBits translates C's `cmp_bits`.
-// Compares the bitsets of two RepSets.
-// Returns 0 if equal, non-zero otherwise (following C's memcmp behavior).
 func cmpBits(set1, set2 *RepSet) int {
-	// `memcmp(set1->bits, set2->bits, sizeof(uint) * set1->size_of_bits);`
-	// In Go, `bytes.Compare` can be used for byte slices. For `[]uint`, we'll
-	// manually compare or convert to byte slices for `bytes.Compare`.
-	// For simplicity, let's convert to `[]byte` then use `bytes.Compare`.
-	// A more direct `for` loop comparison is also possible.
-	// Given they are `[]uint`, direct comparison is clearer.
-
-	// Check if sizes are equal (important for comparison)
 	if set1.SizeOfBits != set2.SizeOfBits || len(set1.Bits) != len(set2.Bits) {
-		// This case shouldn't ideally happen if `SizeOfBits` is consistent,
-		// but `memcmp` relies on the byte count.
-		// A difference in size means they are not equal.
-		return 1 // Not equal
+		return 1
 	}
-
 	for i := uint(0); i < set1.SizeOfBits; i++ {
 		if set1.Bits[i] != set2.Bits[i] {
-			return 1 // Found a difference
+			return 1
 		}
 	}
-	return 0 // All bits are equal
+	return 0
 }
 
-// getNextBit translates C's `get_next_bit`.
-// Returns the index of the next set bit in the RepSet's bitset, starting after `lastPos`.
-// Returns 0 if no more bits are set.
 func (rs *RepSet) getNextBit(lastPos uint) uint {
-	// `uint pos,*start,*end,bits;`
-	// `start=set->bits+ ((lastpos+1) / WORD_BIT);`
-	// `end=set->bits + set->size_of_bits;`
-	// `bits=start[0] & ~((1 << ((lastpos+1) % WORD_BIT)) -1);`
-
 	startIdx := (lastPos + 1) / WordBit
-	if startIdx >= rs.SizeOfBits { // If lastPos was already at or beyond the end
+	if startIdx >= rs.SizeOfBits {
 		return 0
 	}
-
 	var bits uint
-	// Calculate initial `bits` value based on `start[0]` and mask
-	mask := ^uint(0) // All bits set
+	mask := ^uint(0)
 	if (lastPos+1)%WordBit != 0 {
-		mask &^= ((1 << ((lastPos + 1) % WordBit)) - 1) // Clear bits up to (lastPos+1)%WordBit
+		mask &^= ((1 << ((lastPos + 1) % WordBit)) - 1)
 	}
 	bits = rs.Bits[startIdx] & mask
 
-	currentBitIdx := startIdx * WordBit // The logical start of the current `uint` in the bitset
+	currentBitIdx := startIdx * WordBit
 
-	// `while (! bits && ++start < end)`
 	for bits == 0 {
 		startIdx++
 		currentBitIdx = startIdx * WordBit
 		if startIdx >= rs.SizeOfBits {
-			return 0 // No more set bits
+			return 0
 		}
 		bits = rs.Bits[startIdx]
 	}
-
-	// `pos=(uint) (start-set->bits)*WORD_BIT;`
-	// `while (! (bits & 1))`
-	// `{ bits>>=1; pos++; }`
-	// `return pos;`
-
-	// Find the position of the first set bit within `bits`
 	bitOffsetInWord := uint(0)
 	for (bits & 1) == 0 {
 		bits >>= 1
 		bitOffsetInWord++
 	}
-
 	return currentBitIdx + bitOffsetInWord
+}
+
+// --- RepSets Management Functions ---
+
+// initSets translates C's `init_sets`.
+// Initializes the RepSets structure by allocating initial buffers for RepSet states and their bitsets.
+func (rss *RepSets) initSets(states uint) error {
+	// `bzero((char*) sets,sizeof(*sets));`
+	// In Go, struct fields are zero-valued by default upon declaration, so this is handled.
+
+	rss.SizeOfBits = (states + 7) / 8 // Size of `Bits` array in `uint`s, assuming `uint` is 8 bytes in C (which is `sizeof(uint)`)
+	// C: ((states+7)/8) assumes 1 byte per bit in calculation, but then uses sizeof(uint)
+	// If uint is 4 bytes, then `SizeOfBits` is (states + 31) / 32, which is `(states + WordBit - 1) / WordBit`.
+	// The C code actually uses `sizeof(uint) * sets->size_of_bits` for allocation,
+	// implying `SizeOfBits` is calculated as `(states + 8*sizeof(uint) - 1) / (8*sizeof(uint))`.
+	// Let's use `(states + WordBit - 1) / WordBit` for Go to be precise.
+	rss.SizeOfBits = (states + WordBit - 1) / WordBit
+
+	// Allocate initial RepSetBuffer (array of RepSet structs)
+	// `my_malloc(sizeof(REP_SET)*SET_MALLOC_HUNC, MYF(MY_WME))`
+	rss.SetBuffer = make([]RepSet, SetMallocHunc)
+	if rss.SetBuffer == nil {
+		return fmt.Errorf("failed to allocate SetBuffer")
+	}
+
+	// Allocate initial BitBuffer (raw uints for all bitsets)
+	// `my_malloc(sizeof(uint)*sets->size_of_bits*SET_MALLOC_HUNC, MYF(MY_WME))`
+	rss.BitBuffer = make([]uint, rss.SizeOfBits*SetMallocHunc)
+	if rss.BitBuffer == nil {
+		// In C, you'd free SetBuffer here. In Go, it's eligible for GC.
+		return fmt.Errorf("failed to allocate BitBuffer")
+	}
+
+	// Initialize pointers within SetBuffer to point to parts of BitBuffer.
+	// This mirrors `sets->set_buffer[i].bits=bit_buffer; bit_buffer+=sets->size_of_bits;`
+	// in `make_new_set` logic, but done proactively here for the initial chunk.
+	// This setup ensures `SetBuffer[i].Bits` is a slice pointing to a unique segment of `BitBuffer`.
+	for i := 0; i < SetMallocHunc; i++ {
+		startIdx := i * int(rss.SizeOfBits)
+		endIdx := startIdx + int(rss.SizeOfBits)
+		// Each RepSet.Bits gets a sub-slice from the shared BitBuffer
+		rss.SetBuffer[i].Bits = rss.BitBuffer[startIdx:endIdx]
+		rss.SetBuffer[i].SizeOfBits = rss.SizeOfBits // Important for bit ops
+	}
+
+	// Initialize `Set` to point to the active part of `SetBuffer`.
+	// Initially, `Set` is the same as `SetBuffer` because `invisible` is 0.
+	rss.Set = rss.SetBuffer // All allocated sets are initially "visible" and active.
+	rss.Extra = SetMallocHunc
+	rss.Count = 0 // No sets currently in use after init
+
+	return nil
+}
+
+// makeNewSet translates C's `make_new_set`.
+// Returns a pointer to a new, initialized RepSet, handling reallocation if necessary.
+func (rss *RepSets) makeNewSet() *RepSet {
+	// `if (sets->extra)`
+	if rss.Extra > 0 {
+		rss.Extra--
+		// Get the next available set from the current `Set` slice
+		set := &rss.Set[rss.Count] // Get a pointer to the next available element
+		rss.Count++
+
+		// bzero fields (Go's `make` and struct initialization handle this, but explicit zeroing
+		// for slices or fields is good if re-using allocated memory).
+		// For the Bits slice, make sure it's actually zeroed.
+		for i := range set.Bits {
+			set.Bits[i] = 0 // Clear all bits
+		}
+		// Zero the `Next` array
+		for i := range set.Next {
+			set.Next[i] = 0 // Or -1 if that's the default invalid state
+		}
+		set.FoundOffset = 0
+		set.FoundLen = 0
+		set.TableOffset = ^uint(0) // C's (uint) ~0 for max_uint
+
+		// set.SizeOfBits should already be correct from `initSets` or previous allocation.
+		return set
+	}
+
+	// `count=sets->count+sets->invisible+SET_MALLOC_HUNC;`
+	newTotalSets := rss.Count + rss.Invisible + SetMallocHunc
+
+	// Reallocate `SetBuffer` (the underlying array of RepSet structs)
+	// `my_realloc((uchar*) sets->set_buffer, sizeof(REP_SET)*count, MYF(MY_WME))`
+	newSetBuffer := make([]RepSet, newTotalSets)
+	copy(newSetBuffer, rss.SetBuffer) // Copy existing sets
+	rss.SetBuffer = newSetBuffer
+
+	// Reallocate `BitBuffer` (the raw uints for all bitsets)
+	// `my_realloc((uchar*) sets->bit_buffer, (sizeof(uint)*sets->size_of_bits)*count, MYF(MY_WME))`
+	newBitBuffer := make([]uint, rss.SizeOfBits*newTotalSets)
+	copy(newBitBuffer, rss.BitBuffer) // Copy existing bit data
+	rss.BitBuffer = newBitBuffer
+
+	// Re-assign `Bits` slices within the `SetBuffer` to point to the new `BitBuffer`
+	// This loop is crucial because reallocating `BitBuffer` means the old slices
+	// stored in `RepSet.Bits` are no longer valid.
+	for i := 0; i < int(newTotalSets); i++ {
+		startIdx := i * int(rss.SizeOfBits)
+		endIdx := startIdx + int(rss.SizeOfBits)
+		rss.SetBuffer[i].Bits = rss.BitBuffer[startIdx:endIdx]
+		rss.SetBuffer[i].SizeOfBits = rss.SizeOfBits // Ensure this is set for all
+	}
+
+	// Update `Set` to point into the potentially new `SetBuffer`
+	rss.Set = rss.SetBuffer[rss.Invisible:] // Update based on `Invisible` offset
+
+	rss.Extra = SetMallocHunc
+	return rss.makeNewSet() // Recursively call to get a fresh set from the newly allocated buffer
+}
+
+// makeSetsInvisible translates C's `make_sets_invisible`.
+// Marks the currently used sets as "invisible" by adjusting the `Set` slice,
+// allowing `makeNewSet` to start allocating from the beginning of the `SetBuffer` (relative to `Invisible`).
+func (rss *RepSets) makeSetsInvisible() {
+	rss.Invisible += rss.Count              // Add current count to invisible
+	rss.Set = rss.SetBuffer[rss.Invisible:] // Shift the `Set` slice view
+	rss.Count = 0                           // Reset count of visible sets
+}
+
+// freeLastSet translates C's `free_last_set`.
+// Decrements the count of active sets, conceptually "freeing" the last one used.
+// It doesn't deallocate memory but makes it available for reuse.
+func (rss *RepSets) freeLastSet() {
+	if rss.Count > 0 {
+		rss.Count--
+		rss.Extra++
+	}
+}
+
+// freeSets translates C's `free_sets`.
+// Releases the main allocated buffers for `RepSet` structs and their `Bits`.
+func (rss *RepSets) freeSets() {
+	// In Go, setting slices to nil makes their underlying arrays eligible for GC.
+	rss.SetBuffer = nil
+	rss.BitBuffer = nil
+	// rss.Set doesn't need to be nilled explicitly as it's a subslice of SetBuffer.
+	// Zero out counts for good measure.
+	rss.Count = 0
+	rss.Extra = 0
+	rss.Invisible = 0
+	rss.SizeOfBits = 0
 }
 
 // --- Other functions (from previous steps, placeholders) ---
@@ -295,49 +388,51 @@ func myIsspace(charset interface{}, r rune) bool {
 }
 
 func main() {
-	// Example usage for testing bit manipulation:
-	// var rs RepSet
-	// rs.SizeOfBits = 2 // For example, 2 uints, covering up to 64 bits (2 * 32)
-	// rs.Bits = make([]uint, rs.SizeOfBits) // Allocate the bits slice
-
-	// rs.internalSetBit(5)  // Set bit 5
-	// rs.internalSetBit(32) // Set bit 32 (should be in the second uint)
-	// rs.internalSetBit(33) // Set bit 33
-
-	// fmt.Printf("Bits after setting 5, 32, 33: %b %b\n", rs.Bits[0], rs.Bits[1])
-
-	// next := rs.getNextBit(0)
-	// fmt.Printf("Next set bit after 0: %d\n", next) // Should be 5
-	// next = rs.getNextBit(5)
-	// fmt.Printf("Next set bit after 5: %d\n", next) // Should be 32
-	// next = rs.getNextBit(32)
-	// fmt.Printf("Next set bit after 32: %d\n", next) // Should be 33
-	// next = rs.getNextBit(33)
-	// fmt.Printf("Next set bit after 33: %d\n", next) // Should be 0 (no more)
-
-	// rs.internalClearBit(5) // Clear bit 5
-	// fmt.Printf("Bits after clearing 5: %b %b\n", rs.Bits[0], rs.Bits[1])
-	// next = rs.getNextBit(0)
-	// fmt.Printf("Next set bit after 0 (after clearing 5): %d\n", next) // Should be 32
-
-	// var rs2 RepSet
-	// rs2.SizeOfBits = 2
-	// rs2.Bits = make([]uint, rs2.SizeOfBits)
-	// rs2.internalSetBit(32)
-	// rs2.internalSetBit(33)
-	// fmt.Printf("rs2 Bits: %b %b\n", rs2.Bits[0], rs2.Bits[1])
-
-	// if cmpBits(&rs, &rs2) == 0 {
-	// 	fmt.Println("rs and rs2 are equal (should not be)")
-	// } else {
-	// 	fmt.Println("rs and rs2 are not equal (correct)")
+	// Example usage for testing RepSets management:
+	// var rss RepSets
+	// err := rss.initSets(100) // Initialize for 100 states
+	// if err != nil {
+	// 	log.Fatalf("Error initializing RepSets: %v", err)
 	// }
+	// defer rss.freeSets() // Ensure cleanup
 
-	// rs.orBits(&rs2)
-	// fmt.Printf("rs Bits after OR with rs2: %b %b\n", rs.Bits[0], rs.Bits[1]) // Should now have 32, 33
+	// fmt.Printf("Initial rss: Count=%d, Extra=%d, Invisible=%d, SizeOfBits=%d, SetBufferLen=%d, BitBufferLen=%d\n",
+	// 	rss.Count, rss.Extra, rss.Invisible, rss.SizeOfBits, len(rss.SetBuffer), len(rss.BitBuffer))
+
+	// s1 := rss.makeNewSet()
+	// if s1 == nil {
+	// 	log.Fatalf("Failed to make new set 1")
+	// }
+	// s1.internalSetBit(5)
+	// fmt.Printf("After s1: Count=%d, Extra=%d, SetBufferLen=%d\n", rss.Count, rss.Extra, len(rss.SetBuffer))
+
+	// s2 := rss.makeNewSet()
+	// if s2 == nil {
+	// 	log.Fatalf("Failed to make new set 2")
+	// }
+	// fmt.Printf("After s2: Count=%d, Extra=%d, SetBufferLen=%d\n", rss.Count, rss.Extra, len(rss.SetBuffer))
+
+	// rss.makeSetsInvisible()
+	// fmt.Printf("After makeSetsInvisible: Count=%d, Extra=%d, Invisible=%d, SetBufferLen=%d\n",
+	// 	rss.Count, rss.Extra, rss.Invisible, len(rss.SetBuffer))
+
+	// s3 := rss.makeNewSet() // Should allocate from invisible section now
+	// if s3 == nil {
+	// 	log.Fatalf("Failed to make new set 3")
+	// }
+	// fmt.Printf("After s3: Count=%d, Extra=%d, Invisible=%d, SetBufferLen=%d\n",
+	// 	rss.Count, rss.Extra, rss.Invisible, len(rss.SetBuffer))
+
+	// for i := 0; i < SetMallocHunc*2; i++ { // Force reallocation
+	// 	_ = rss.makeNewSet()
+	// }
+	// fmt.Printf("After many new sets (potential reallocation): Count=%d, Extra=%d, SetBufferLen=%d, BitBufferLen=%d\n",
+	// 	rss.Count, rss.Extra, len(rss.SetBuffer), len(rss.BitBuffer))
+
+	// rss.freeSets()
+	// fmt.Printf("After freeSets: SetBuffer=%v, BitBuffer=%v\n", rss.SetBuffer, rss.BitBuffer)
 }
 
-// ... (other placeholder functions like staticGetOptions, getReplaceStrings, etc.)
 func staticGetOptions(args []string) ([]string, error) { return args, nil }
 func getReplaceStrings(args []string, fromArray, toArray *PointerArray) ([]string, error) {
 	return args, nil
