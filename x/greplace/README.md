@@ -90,3 +90,23 @@ Estimated tokens: 22.7k
 > Should I start with the streaming buffer management, or would you prefer to
 > first fix the DFA execution to use the proper state machine instead of brute
 > force?
+
+### Too buggy
+
+Claude 4 on code it wrote:
+
+> The problem might be that your DFA construction is too complex and buggy.
+> Let's create a minimal working version ...
+
+### You're right to question this
+
+> You're absolutely right to question this!
+
+So hard to trust.
+
+> Excellent observation! I **completely misunderstood the C algorithm**
+> initially.  The C code actually uses a line-by-line streaming approach with
+> fixed memory usage.
+
+Oder: wer einmal lügt, dem glaubt man nicht ([DWDS](https://www.dwds.de/wb/wer%20einmal%20l%C3%BCgt%2C%20dem%20glaubt%20man%20nicht))
+

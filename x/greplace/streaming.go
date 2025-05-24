@@ -70,17 +70,29 @@ func (sre *StreamingReplacementEngine) ReplaceStream(reader io.Reader, writer io
 			continue
 		}
 
+		isEOF := (err == io.EOF)
+
 		// Combine overlap from previous chunk with new data
 		currentChunk := sre.combineChunks(sre.readBuf[:n])
 
-		// Process this chunk
-		processedData, overlap, updated := sre.processChunk(currentChunk)
+		var processedData []byte
+		var overlap []byte
+		var updated bool
+
+		if isEOF {
+			// This is the final chunk - process everything without saving overlap
+			processedData, updated = sre.replaceInBytes(currentChunk)
+			overlap = nil // No overlap needed for final chunk
+		} else {
+			// Normal chunk processing with overlap reservation
+			processedData, overlap, updated = sre.processChunk(currentChunk)
+		}
 
 		if updated {
 			sre.updated = true
 		}
 
-		// Write processed data (excluding overlap for next iteration)
+		// Write processed data
 		if len(processedData) > 0 {
 			err = sre.writeBuffer(writer, processedData)
 			if err != nil {
@@ -88,25 +100,13 @@ func (sre *StreamingReplacementEngine) ReplaceStream(reader io.Reader, writer io
 			}
 		}
 
-		// Save overlap for next iteration
+		// Save overlap for next iteration (only if not EOF)
 		sre.overlapBuf = sre.overlapBuf[:0]
-		sre.overlapBuf = append(sre.overlapBuf, overlap...)
+		if !isEOF && len(overlap) > 0 {
+			sre.overlapBuf = append(sre.overlapBuf, overlap...)
+		}
 
-		// Check for read completion
-		if err == io.EOF {
-			// Process final overlap
-			if len(sre.overlapBuf) > 0 {
-				finalData, _, finalUpdated := sre.processChunk(sre.overlapBuf)
-				if finalUpdated {
-					sre.updated = true
-				}
-				if len(finalData) > 0 {
-					err = sre.writeBuffer(writer, finalData)
-					if err != nil {
-						return false, fmt.Errorf("final write error: %v", err)
-					}
-				}
-			}
+		if isEOF {
 			break
 		}
 	}
@@ -129,16 +129,19 @@ func (sre *StreamingReplacementEngine) combineChunks(newData []byte) []byte {
 }
 
 // processChunk processes a chunk of data, returning processed data and overlap
+// This is only called for non-final chunks
 func (sre *StreamingReplacementEngine) processChunk(chunk []byte) (processedData []byte, overlap []byte, updated bool) {
 	if len(chunk) == 0 {
 		return nil, nil, false
 	}
 
-	// Reserve overlap region (last maxPatternLen bytes)
+	// Reserve overlap region (last maxPatternLen bytes) only if chunk is large enough
 	overlapStart := len(chunk)
 	if len(chunk) > sre.maxPatternLen {
 		overlapStart = len(chunk) - sre.maxPatternLen
 	}
+	// If chunk <= maxPatternLen, process everything and save all as overlap
+	// This handles the case where patterns might span chunk boundaries
 
 	// Process the main part (excluding overlap region)
 	mainData := chunk[:overlapStart]
@@ -178,9 +181,9 @@ func (sre *StreamingReplacementEngine) replaceInBytes(data []byte) ([]byte, bool
 		}
 
 		// Prevent write buffer from growing too large
-		if len(sre.writeBuf) > WriteBufferSize {
+		if len(sre.writeBuf) > WriteBufferSize*4 { // Allow some growth but not unbounded
 			// This shouldn't happen with normal patterns, but safety check
-			break
+			return sre.writeBuf[:len(sre.writeBuf)], updated
 		}
 	}
 

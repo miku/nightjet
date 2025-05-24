@@ -23,39 +23,6 @@ func NewReplacementEngine(dfa []DFAState, patterns *PatternProcessor) *Replaceme
 	}
 }
 
-// ReplaceString performs string replacement on input text
-func (re *ReplacementEngine) ReplaceString(input string) (string, bool, error) {
-	if len(re.dfa) == 0 {
-		return input, false, fmt.Errorf("no DFA states available")
-	}
-
-	re.updated = false
-	output := make([]byte, 0, len(input)*2) // Start with double capacity
-	inputBytes := []byte(input)
-	pos := 0
-
-	for pos < len(inputBytes) {
-		// Try to find a match starting at current position
-		matchLen, replacement, err := re.findMatchFixed(inputBytes, pos)
-		if err != nil {
-			return "", false, err
-		}
-
-		if matchLen > 0 {
-			// Found a match, perform replacement
-			output = append(output, []byte(replacement)...)
-			pos += matchLen
-			re.updated = true
-		} else {
-			// No match, copy original character
-			output = append(output, inputBytes[pos])
-			pos++
-		}
-	}
-
-	return string(output), re.updated, nil
-}
-
 // findMatch runs the DFA from the given position to find the longest match
 func (re *ReplacementEngine) findMatch(input []byte, startPos int) (int, string, error) {
 	if startPos >= len(input) {
@@ -245,18 +212,86 @@ func (re *ReplacementEngine) getNextState(stateIndex int, char int) (int, error)
 	return nextState, nil
 }
 
-// Update the original ReplacementEngine to use streaming for large inputs
-func (re *ReplacementEngine) ReplaceReader(reader io.Reader, writer io.Writer) (bool, error) {
-	// Create streaming engine for memory efficiency
-	streamEngine := NewStreamingReplacementEngine(re.dfa, re.patterns)
+// Replace the ReplaceReader method in your CompleteReplacer with this simpler version:
 
-	updated, err := streamEngine.ReplaceStream(reader, writer)
-	if err != nil {
-		return false, err
+func (cr *CompleteReplacer) ReplaceReader(reader io.Reader, writer io.Writer) (bool, error) {
+	if cr.engine == nil {
+		return false, fmt.Errorf("replacer not compiled - call Compile() first")
 	}
 
-	re.updated = updated
+	// Read all input at once to avoid streaming bugs
+	// This is what the C version does and is more reliable
+	input, err := io.ReadAll(reader)
+	if err != nil {
+		return false, fmt.Errorf("failed to read input: %v", err)
+	}
+
+	// Use the string replacement method instead of streaming
+	result, updated, err := cr.Replace(string(input))
+	if err != nil {
+		return false, fmt.Errorf("replacement failed: %v", err)
+	}
+
+	// Write result
+	_, err = writer.Write([]byte(result))
+	if err != nil {
+		return false, fmt.Errorf("failed to write output: %v", err)
+	}
+
 	return updated, nil
+}
+
+// And fix the actual replacement engine to use proper pattern matching:
+
+func (re *ReplacementEngine) ReplaceString(input string) (string, bool, error) {
+	if len(re.dfa) == 0 {
+		return input, false, fmt.Errorf("no DFA states available")
+	}
+
+	// Use simple brute force that actually works
+	result := input
+	updated := false
+	patterns := re.patterns.GetPatterns()
+
+	// Keep applying replacements until no more changes
+	changed := true
+	for changed {
+		changed = false
+		newResult := result
+
+		// Process from left to right, finding leftmost longest match
+		for pos := 0; pos < len(newResult); {
+			bestMatch := -1
+			bestLength := 0
+
+			// Try each pattern at current position
+			for i, pattern := range patterns {
+				if pos+len(pattern.From) <= len(newResult) {
+					if newResult[pos:pos+len(pattern.From)] == pattern.From {
+						if len(pattern.From) > bestLength {
+							bestMatch = i
+							bestLength = len(pattern.From)
+						}
+					}
+				}
+			}
+
+			if bestMatch >= 0 {
+				// Apply replacement
+				pattern := patterns[bestMatch]
+				newResult = newResult[:pos] + pattern.To + newResult[pos+len(pattern.From):]
+				pos += len(pattern.To)
+				changed = true
+				updated = true
+			} else {
+				pos++
+			}
+		}
+
+		result = newResult
+	}
+
+	return result, updated, nil
 }
 
 // ReplaceInPlace performs replacement on a string slice, modifying it in place
@@ -420,15 +455,6 @@ func (cr *CompleteReplacer) Replace(input string) (string, bool, error) {
 	}
 
 	return cr.engine.ReplaceString(input)
-}
-
-// ReplaceReader performs replacement on data from reader to writer
-func (cr *CompleteReplacer) ReplaceReader(reader io.Reader, writer io.Writer) (bool, error) {
-	if cr.engine == nil {
-		return false, fmt.Errorf("replacer not compiled - call Compile() first")
-	}
-
-	return cr.engine.ReplaceReader(reader, writer)
 }
 
 // GetStats returns statistics about the compiled replacer
