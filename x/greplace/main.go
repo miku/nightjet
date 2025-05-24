@@ -11,7 +11,7 @@ import (
 	// For checking space characters
 )
 
-// --- Constants ---
+// --- Global Constants ---
 const (
 	PcMalloc      = 256
 	PsMalloc      = 512
@@ -23,7 +23,7 @@ const (
 	SetMallocHunc = 64
 )
 
-// Placeholder for C's MYF flags (Moved to top level to ensure definition before use)
+// --- MYF_ Flags (Ensuring these are defined globally before any usage) ---
 const (
 	MYF_ME_BELL     = 1 << 0
 	MYF_MY_WME      = 1 << 1
@@ -1044,7 +1044,7 @@ func convertFile(rep *Replace, name string) int {
 		// Atomically replace the original file with the temporary one.
 		err = os.Rename(tempname, orgName)
 		if err != nil {
-			myMessage(MYF_MY_WME|MYF_MY_LINK_WARNING, "Failed to rename temporary file to %s: %v", orgName, err)
+			myMessage(MYF_MY_WME|MY_LINK_WARNING, "Failed to rename temporary file to %s: %v", orgName, err)
 			return 1
 		}
 	} else {
@@ -1062,7 +1062,7 @@ func convertFile(rep *Replace, name string) int {
 	return errorVal // Return 0 for success, 1 for error
 }
 
-// --- Main function and general utilities ---
+// --- Main function and general utilities (Ensuring these are defined globally) ---
 
 // myMessage is a placeholder for C's my_message function.
 func myMessage(flags int, msg string, args ...interface{}) {
@@ -1199,7 +1199,7 @@ func getReplaceStrings(argc *int, argv *[]string, fromArray, toArray *PointerArr
 
 // --- Main Program ---
 func main() {
-	myInit(os.Args[0])
+	myInit(os.Args[0]) // myInit is defined below, but in the same package, so it's accessible.
 
 	args := os.Args
 	argc := len(args)
@@ -1253,7 +1253,7 @@ func main() {
 	if verbose != 0 {
 		flags |= MY_GIVE_INFO
 	}
-	myEnd(flags)
+	myEnd(flags) // myEnd is defined below, but in the same package, so it's accessible.
 
 	if errorResult != 0 {
 		os.Exit(2)
@@ -1261,3 +1261,44 @@ func main() {
 		os.Exit(0)
 	}
 }
+
+// --- General Utility Functions (Ensuring these are defined globally and correctly) ---
+
+// myInit is a placeholder for C's my_init.
+func myInit(progname string) {
+	myProgname = progname
+	log.SetPrefix(progname + ": ")
+	log.SetFlags(0) // No timestamp by default, adjust as needed
+}
+
+// myEnd is a placeholder for C's my_end.
+func myEnd(flags int) {
+	if (flags&MY_CHECK_ERROR) != 0 && updated != 0 {
+		if verbose != 0 {
+			fmt.Println("Program finished with updates.")
+		}
+	}
+	// In Go, defer statements handle resource cleanup; os.Exit terminates.
+}
+
+// // myMessage is a placeholder for C's my_message function.
+// func myMessage(flags int, msg string, args ...interface{}) {
+// 	fmt.Fprintf(os.Stderr, "Error: %s\n", fmt.Sprintf(msg, args...))
+// }
+//
+// // Dummy for `strcmp` from C's `string.h` for use in `getReplaceStrings`
+// func myStrcmp(s1, s2 string) int {
+// 	return strings.Compare(s1, s2)
+// }
+//
+// // Dummy for `my_isspace` from `m_ctype.h` for use in `main`.
+// func myIsspace(charset interface{}, r rune) bool {
+// 	return r == ' ' || r == '\t' || r == '\n' || r == '\r' || r == '\v' || r == '\f'
+// }
+//
+// // `my_disable_symlinks` from C's `my_sys.h`
+// var myDisableSymlinks = false
+//
+// // `my_progname` from C's `my_global.h`
+// // This variable is already declared globally at the top.
+// // var myProgname = "replace_strings" // Removed duplicate declaration.
