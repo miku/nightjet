@@ -31,6 +31,8 @@ Retry with Gemini.
 > construction and string replacement logic, but it's a good learning exercise
 > for understanding Go's idioms and memory model compared to C. **Good luck!**
 
+https://gemini.google.com/app/ba56cb08783f8050
+
 ## Notes
 
 ### Canvas

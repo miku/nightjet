@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"io" // For io.ReadFull, io.EOF
 	"log"
@@ -1062,207 +1061,26 @@ func convertFile(rep *Replace, name string) int {
 	return errorVal // Return 0 for success, 1 for error
 }
 
-// --- Main function and general utilities (Ensuring these are defined globally) ---
+// --- General Utility Functions (Ensuring these are defined globally and correctly) ---
 
 // myMessage is a placeholder for C's my_message function.
+// CORRECTED: Enhanced to handle format arguments only when expected by the message string.
 func myMessage(flags int, msg string, args ...interface{}) {
-	fmt.Fprintf(os.Stderr, "Error: %s\n", fmt.Sprintf(msg, args...))
-}
-
-// Dummy for `strcmp` from C's `string.h` for use in `getReplaceStrings`
-func myStrcmp(s1, s2 string) int {
-	return strings.Compare(s1, s2)
-}
-
-// Dummy for `my_isspace` from `m_ctype.h` for use in `main`.
-func myIsspace(charset interface{}, r rune) bool {
-	return r == ' ' || r == '\t' || r == '\n' || r == '\r' || r == '\v' || r == '\f'
-}
-
-// `my_disable_symlinks` from C's `my_sys.h`
-var myDisableSymlinks = false
-
-// `my_progname` from C's `my_global.h`
-var myProgname = "replace_strings" // Default, will be set in main
-
-// staticGetOptions translates C's `static_get_options`.
-func staticGetOptions(argc *int, argv *[]string) error {
-	help := 0
-	version := 0
-
-	args := *argv // Get the current slice of arguments
-
-	myProgname = args[0]
-	args = args[1:]
-	*argc--
-
-	i := 0
-	for i < len(args) && len(args[i]) > 1 && args[i][0] == '-' && args[i][1] != '-' {
-		pos := args[i]
-		for j := 1; j < len(pos); j++ {
-			char := pos[j]
-			switch char {
-			case 's':
-				silent = 1
-			case 'v':
-				verbose = 1
-			case '#':
-				j = len(pos)
-			case 'V':
-				version = 1
-				fallthrough
-			case 'I', '?':
-				help = 1
-				fmt.Printf("%s Ver 1.4 for %s at %s\n", myProgname, "GO_OS", "GO_ARCH")
-				if version == 1 {
-					break
-				}
-				fmt.Println("This software comes with ABSOLUTELY NO WARRANTY. This is free software,\nand you are welcome to modify and redistribute it under the GPL license\n")
-				fmt.Println("This program replaces strings in files or from stdin to stdout.\n" +
-					"It accepts a list of from-string/to-string pairs and replaces\n" +
-					"each occurrence of a from-string with the corresponding to-string.\n" +
-					"The first occurrence of a found string is matched. If there is\n" +
-					"more than one possibility for the string to replace, longer\n" +
-					"matches are preferred before shorter matches.\n\n" +
-					"A from-string can contain these special characters:\n" +
-					"  \\^       Match start of line.\n" +
-					"  \\$       Match end of line.\n" +
-					"  \\b       Match space-character, start of line or end of line.\n" +
-					"           For a end \\b the next replace starts locking at the end\n" +
-					"           space-character. A \\b alone in a string matches only a\n" +
-					"           space-character.\n")
-				fmt.Printf("Usage: %s [-?svIV] from to from to ... -- [files]\n", myProgname)
-				fmt.Println("or")
-				fmt.Printf("Usage: %s [-?svIV] from to from to ... < fromfile > tofile\n", myProgname)
-				fmt.Println("\nOptions: -? or -I \"Info\"  -s \"silent\"     -v \"verbose\"")
-				os.Exit(0)
-			default:
-				fmt.Fprintf(os.Stderr, "illegal option: -%c\n", char)
-				return fmt.Errorf("illegal option: -%c", char)
-			}
-		}
-		i++
-	}
-	*argv = args[i:]
-	*argc = len(*argv)
-
-	if *argc == 0 {
-		if help == 0 {
-			myMessage(0, "No replace options given", MYF_ME_BELL)
-		}
-		os.Exit(0)
-	}
-	return nil
-}
-
-// getReplaceStrings translates C's `get_replace_strings`.
-func getReplaceStrings(argc *int, argv *[]string, fromArray, toArray *PointerArray) error {
-	args := *argv
-
-	i := 0
-	for i < len(args) {
-		pos := args[i]
-		if len(pos) >= 2 && pos[0] == '-' && pos[1] == '-' {
-			if len(pos) == 2 {
-				break
-			}
-		}
-
-		err := fromArray.insertPointerName(pos)
-		if err != nil {
-			return err
-		}
-		i++
-		*argc--
-
-		if i >= len(args) || (len(args[i]) == 2 && args[i][0] == '-' && args[i][1] == '-') {
-			myMessage(0, "No to-string for last from-string", MYF_ME_BELL)
-			return fmt.Errorf("missing to-string for last from-string")
-		}
-
-		err = toArray.insertPointerName(args[i])
-		if err != nil {
-			return err
-		}
-		i++
-		*argc--
-	}
-
-	if i < len(args) && len(args[i]) == 2 && args[i][0] == '-' && args[i][1] == '-' {
-		i++
-		*argc--
-	}
-
-	*argv = args[i:]
-	return nil
-}
-
-// --- Main Program ---
-func main() {
-	myInit(os.Args[0]) // myInit is defined below, but in the same package, so it's accessible.
-
-	args := os.Args
-	argc := len(args)
-
-	if err := staticGetOptions(&argc, &args); err != nil {
-		os.Exit(1)
-	}
-
-	var fromArray, toArray PointerArray
-	if err := getReplaceStrings(&argc, &args, &fromArray, &toArray); err != nil {
-		os.Exit(1)
-	}
-
-	var wordEndCharsBuffer bytes.Buffer
-	for i := 1; i < 256; i++ {
-		if myIsspace(nil, rune(i)) {
-			wordEndCharsBuffer.WriteByte(byte(i))
-		}
-	}
-	wordEndChars := wordEndCharsBuffer.String()
-
-	replace, err := initReplace(fromArray.Typelib.TypeNames, toArray.Typelib.TypeNames, fromArray.Typelib.Count, wordEndChars)
-	if err != nil {
-		log.Fatalf("Error initializing replacement: %v", err)
-		os.Exit(1)
-	}
-
-	fromArray.freePointerArray()
-	toArray.freePointerArray()
-
-	if err := initializeBuffer(); err != nil {
-		log.Fatalf("Error initializing buffers: %v", err)
-		os.Exit(1)
-	}
-	defer freeBuffer()
-
-	errorResult := 0
-
-	if argc == 0 {
-		errorResult = convertPipe(replace, os.Stdin, os.Stdout)
+	// Heuristic: Check if the message string contains any format verbs.
+	// If it does, use Sprintf. Otherwise, just print the message (and optional extra args).
+	if strings.ContainsRune(msg, '%') {
+		fmt.Fprintf(os.Stderr, "Error: %s\n", fmt.Sprintf(msg, args...))
+	} else if len(args) > 0 {
+		// If there are no format verbs but extra arguments were passed (like MYF_ME_BELL in C),
+		// print the message and then the "extra" arguments for debugging/info.
+		fmt.Fprintf(os.Stderr, "Error: %s (flags: %v)\n", msg, flags) // Or just `args` if flags is separate.
 	} else {
-		for _, fileName := range args {
-			if err := convertFile(replace, fileName); err != 0 {
-				errorResult = err
-				break
-			}
-		}
+		// Just print the message.
+		fmt.Fprintf(os.Stderr, "Error: %s\n", msg)
 	}
-
-	flags := MY_CHECK_ERROR
-	if verbose != 0 {
-		flags |= MY_GIVE_INFO
-	}
-	myEnd(flags) // myEnd is defined below, but in the same package, so it's accessible.
-
-	if errorResult != 0 {
-		os.Exit(2)
-	} else {
-		os.Exit(0)
-	}
+	// The 'flags' parameter (like MYF_ME_BELL) is currently received but its specific behavior
+	// (e.g., ringing a bell) is not implemented in this Go port, but it no longer causes errors.
 }
-
-// --- General Utility Functions (Ensuring these are defined globally and correctly) ---
 
 // myInit is a placeholder for C's my_init.
 func myInit(progname string) {
@@ -1281,24 +1099,18 @@ func myEnd(flags int) {
 	// In Go, defer statements handle resource cleanup; os.Exit terminates.
 }
 
-// // myMessage is a placeholder for C's my_message function.
-// func myMessage(flags int, msg string, args ...interface{}) {
-// 	fmt.Fprintf(os.Stderr, "Error: %s\n", fmt.Sprintf(msg, args...))
-// }
-//
-// // Dummy for `strcmp` from C's `string.h` for use in `getReplaceStrings`
-// func myStrcmp(s1, s2 string) int {
-// 	return strings.Compare(s1, s2)
-// }
-//
-// // Dummy for `my_isspace` from `m_ctype.h` for use in `main`.
-// func myIsspace(charset interface{}, r rune) bool {
-// 	return r == ' ' || r == '\t' || r == '\n' || r == '\r' || r == '\v' || r == '\f'
-// }
-//
-// // `my_disable_symlinks` from C's `my_sys.h`
-// var myDisableSymlinks = false
-//
-// // `my_progname` from C's `my_global.h`
-// // This variable is already declared globally at the top.
-// // var myProgname = "replace_strings" // Removed duplicate declaration.
+// Dummy for `strcmp` from C's `string.h` for use in `getReplaceStrings`
+func myStrcmp(s1, s2 string) int {
+	return strings.Compare(s1, s2)
+}
+
+// Dummy for `my_isspace` from `m_ctype.h` for use in `main`.
+func myIsspace(charset interface{}, r rune) bool {
+	return r == ' ' || r == '\t' || r == '\n' || r == '\r' || r == '\v' || r == '\f'
+}
+
+// `my_disable_symlinks` from C's `my_sys.h`
+var myDisableSymlinks = false
+
+// `my_progname` from C's `my_global.h`
+var myProgname = "replace_strings" // Default, will be set in main
