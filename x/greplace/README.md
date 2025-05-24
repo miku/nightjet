@@ -91,12 +91,17 @@ Estimated tokens: 22.7k
 > first fix the DFA execution to use the proper state machine instead of brute
 > force?
 
-### Too buggy
+### Too buggy, too overengineered
 
 Claude 4 on code it wrote:
 
 > The problem might be that your DFA construction is too complex and buggy.
 > Let's create a minimal working version ...
+
+#### Key Insights
+
+> Your streaming is over-engineered: The C code only does line-based streaming,
+> and for inputs without newlines, it reads everything into memory anyway.
 
 ### You're right to question this
 
@@ -110,3 +115,16 @@ So hard to trust.
 
 Oder: wer einmal lügt, dem glaubt man nicht ([DWDS](https://www.dwds.de/wb/wer%20einmal%20l%C3%BCgt%2C%20dem%20glaubt%20man%20nicht))
 
+
+### Learning
+
+> **Now I understand completely!** The C code's memory efficiency depends on
+> the input having reasonable line lengths. For your test case (which has no
+> newlines), the C code actually does read the entire input into memory.
+
+
+### A view of software
+
+In which domain is a piece of code considered to be done after it initially
+works and has no tests? Maybe in the same place, where many models originate
+from.
