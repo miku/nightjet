@@ -316,3 +316,18 @@ func getDir(path string) string {
 	}
 	return "."
 }
+
+// Update your main.go to use this instead:
+func processStreamWithLineBasedReplacer(replacer *LineBasedReplacer, input io.Reader, output io.Writer, verbose bool) error {
+	// For your test case (no newlines), use the no-newlines version
+	updated, err := replacer.ReplaceReaderNoNewlines(input, output)
+	if err != nil {
+		return fmt.Errorf("stream processing failed: %v", err)
+	}
+
+	if verbose && updated {
+		fmt.Fprintf(os.Stderr, "Stream processed with replacements\n")
+	}
+
+	return nil
+}

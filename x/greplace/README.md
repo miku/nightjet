@@ -103,6 +103,11 @@ Claude 4 on code it wrote:
 > Your streaming is over-engineered: The C code only does line-based streaming,
 > and for inputs without newlines, it reads everything into memory anyway.
 
+> Your pattern matching has bugs: The complex DFA execution in your Go code is
+> incorrect.
+
+Who is you?
+
 ### You're right to question this
 
 > You're absolutely right to question this!
