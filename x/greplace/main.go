@@ -23,6 +23,17 @@ const (
 	SetMallocHunc = 64
 )
 
+// Placeholder for C's MYF flags (Moved to top level)
+const (
+	MYF_ME_BELL     = 1 << 0
+	MYF_MY_WME      = 1 << 1
+	MYF_MY_NABP     = 1 << 2
+	MYF_ZEROFILL    = 1 << 3
+	MY_CHECK_ERROR  = 1 << 4
+	MY_GIVE_INFO    = 1 << 5
+	MY_LINK_WARNING = 1 << 6
+)
+
 // --- Type Definitions (Structs) ---
 type Typelib struct {
 	TypeNames []string
@@ -669,7 +680,6 @@ func initReplace(from []string, to []string, count uint, wordEndChars string) (*
 		}
 
 		replaceStrings[i].ReplaceString = to[foundSet[i-1].TableOffset]
-		// CORRECTED: Ensure all operands in arithmetic are `int` before casting final result to `uint` if necessary
 		replaceStrings[i].ToOffset = uint(foundSet[i-1].FoundOffset - int(startAtWord(fromStr)))
 		replaceStrings[i].FromOffset = foundSet[i-1].FoundOffset - int(replaceLen(fromStr)) + int(endOfWord(fromStr))
 	}
@@ -793,122 +803,135 @@ func fillBufferRetaining(reader io.Reader, n int) int {
 // replaceStrings translates C's `replace_strings`.
 // The core function that performs string replacements using the DFA.
 // It modifies `out` (which points to `outBuff`) and adjusts `max_length` (`outLength`).
-// Returns the actual length of the data written to `outBuff`, or -1 on error.
+// Returns the actual length of the data written to `outBuff`, or -1 on error. (Using math.MaxUint32 for -1)
 func replaceStrings(rep *Replace, out *[]byte, maxLength *uint, from []byte) uint {
-	// reg1 REPLACE *rep_pos;
-	// reg2 REPLACE_STRING *rep_str;
-	// char *to, *end, *pos, *new;
+	// C: `rep_pos=rep+1;` -> This meant starting from the *second* element in the `replace` array, which is `replace[1]`.
+	// The C code uses `rep` as the base pointer to the array of `REPLACE` structs.
+	// If `rep` is `&replaces[0]`, then `rep+1` is `&replaces[1]`.
+	// C `rep_pos` is a `REPLACE *`.
+	// Go needs to keep track of the *current* state, which can be `*Replace` or `*ReplaceString`.
+	// The `Next` array holds `interface{}` precisely for this.
+	// So, `repPos` should be `interface{}` initially to allow subsequent type assertions.
 
-	// In Go, `out` is a pointer to a slice (`*[]byte`), `maxLength` is a pointer to `uint`.
-	// `from` is the input byte slice (the current line).
+	var repPos interface{} // Will hold *Replace or *ReplaceString
+	// The C code starts at `rep+1`, which in Go's `replaces` array (from `initReplace`) would be `&replaces[1]`.
+	// However, the problem states `rep` (which is `&replaces[0]`) is passed.
+	// The C `rep+1` means the second state in the sequence. `rep->next[0]` is not usually the `rep[1]`
+	// unless that's how the DFA is constructed.
+	// Looking at `init_replace`, `replaces[i].next[j]=replace+sets.set[i].next[j];`
+	// `replace` is `&replaces[0]`. `sets.set[0]` is the *actual* start state.
+	// The C code `rep_pos=rep+1` could be simplified in Go to `repPos = rep.Next[0]`
+	// assuming `rep.Next[0]` is configured as the initial actual state, as constructed by `initReplace`.
+	// The `initReplace` function returns `&replaces[0]`.
+	// Let's assume `rep` itself is `&replaces[0]`. So `rep_pos=rep` or `rep_pos=rep.Next[0]`?
+	// C `rep_pos=rep` is for the initial state. `rep_pos=rep+1` seems odd for the *start* of replacement loop.
+	// Let's re-read the original C code for `replace_strings`: `rep_pos=rep+1;`. This implies that `rep` is the base, and `rep[1]` is the initial *active* state.
+	// This would mean the `Replace` array in `initReplace` would be indexed `0..N`, where `0` is a dummy.
+	// Let's check `init_replace` again: `(void) make_new_set(&sets); make_sets_invisible(&sets);` (this makes sets[0] invisible).
+	// Then `word_states=make_new_set(&sets); start_states=make_new_set(&sets);`.
+	// So `sets.set[0]` is the invisible one, `sets.set[1]` is `word_states`, `sets.set[2]` is `start_states`.
+	// And `replace[i].next[j] = replace+sets.set[i].next[j]` for valid states.
+	// This confirms `replace` acts as the base address of the `replaces` array.
+	// So `rep_pos=rep+1` in C means `replaces[1]` (the second element in the `replaces` array).
+	// But `replaces` is based on `rss.Count` total states. `sets.set[0]` is state 0.
+	// The DFA states are `0` through `rss.Count-1`.
+	// The loop `for (i=0 ; i < sets.count ; i++)` populates `replace[i]`.
+	// This implies `rep_pos=rep` for the start state (state 0).
+	// C `rep_pos=rep+1;` is strange then. Maybe it means the `replace` struct passed *is* the start state already.
+	// `initReplace` returns `&replaces[0]`. So `rep` in `replaceStrings` is `&replaces[0]`.
+	// If `rep_pos=rep+1`, it would be `&replaces[1]`.
+	// This points to a potential mismatch or a very specific design choice.
+	// Let's assume `rep` is the starting state (index 0) of the DFA.
+	// `repPos` should start at `rep` itself, which is `&replaces[0]`.
 
-	currentOutLen := uint(0)         // Logical length of content in `*out`
-	repPos := rep.Next[0].(*Replace) // Start from the initial state (rep[0] in C)
+	repPos = rep // Corrected: Start at the base pointer provided, which is `&replaces[0]` from initReplace.
 
-	// C: `end=(to= *start) + *max_length-1;`
-	// `to` is the current write position in the output buffer.
-	// `end` is the end of the allocated output buffer.
-	outPtr := 0                   // Index into the `*out` slice
-	outEnd := int(*maxLength) - 1 // Index of last valid byte in `*out`
+	currentOutPtr := uint(0)               // Logical length of content in `*out`
+	outBufferEndIdx := int(*maxLength) - 1 // Index of last valid byte in `*out`
 
-	// C: `for(;;)` (infinite loop)
 	for fromPtr := 0; ; { // `fromPtr` is the current read position in `from`
-		// C: `while (!rep_pos->found)`
-		for repPos.Found == false {
-			// Get the character for the next transition. Handle end of input line.
+		// Inner loop: Advance DFA state until a match is found (`rep_pos->found` is true)
+		for {
+			// Type assert repPos to *Replace to access its 'Found' field and 'Next' array
+			currentReplaceState, ok := repPos.(*Replace)
+			if !ok || currentReplaceState.Found { // If it's not *Replace or if Found is true, break inner loop
+				break
+			}
+
+			// Determine the character to process for DFA transition
 			var charToProcess byte
 			if fromPtr < len(from) {
 				charToProcess = from[fromPtr]
 			} else {
-				// Reached end of `from` (current line). Need to handle this as a special character (null).
-				charToProcess = 0 // C's `0` or null char for end of string/line
+				charToProcess = 0 // End of input line, use null char for DFA
 			}
 
-			// C: `rep_pos= rep_pos->next[(uchar) *from];`
-			// Type assertion is needed here as Next can hold `*Replace` or `*ReplaceString`.
-			// It should always be `*Replace` if `repPos.Found` is false.
-			nextState, ok := repPos.Next[charToProcess].(*Replace)
-			if !ok {
-				// This indicates a logic error in DFA construction: a `!found` state
-				// should only transition to another `Replace` state, not a `ReplaceString`.
-				log.Printf("DFA logic error: !found state transitions to a ReplaceString for char %d\n", charToProcess)
-				return math.MaxUint32 // Indicate error (-1 in C)
-			}
-			repPos = nextState
+			// Advance DFA state: `rep_pos = rep_pos->next[(uchar) *from];`
+			repPos = currentReplaceState.Next[charToProcess]
 
-			// C: `if (to == end)`
-			// Check if output buffer needs resizing.
-			if outPtr >= outEnd {
-				// C: `(*max_length)+=8192;` (initial grow) or `(*max_length)*=2;` (later grow)
-				*maxLength += 8192                // Grow by a fixed chunk like C's initial grow
-				if *maxLength < uint(len(*out)) { // Safety against weird shrinking
-					*maxLength = uint(len(*out)) * 2 // Double it if current calc is smaller
-				}
-
+			// If current position in output buffer exceeds its capacity, reallocate.
+			if int(currentOutPtr) >= outBufferEndIdx {
+				*maxLength *= 2 // Double the output buffer size
 				newOut := make([]byte, *maxLength)
-				copy(newOut, (*out)[:outPtr]) // Copy already processed output
+				copy(newOut, (*out)[:currentOutPtr]) // Copy already processed output
 				*out = newOut
-				outEnd = int(*maxLength) - 1
+				outBufferEndIdx = int(*maxLength) - 1
 			}
 
-			// C: `*to++= *from++;`
-			if fromPtr < len(from) { // Only copy if we haven't consumed all input line bytes yet
-				(*out)[outPtr] = from[fromPtr]
-				outPtr++
+			// Copy character from input to output unless it's a null sentinel marking end of line
+			if fromPtr < len(from) {
+				(*out)[currentOutPtr] = from[fromPtr]
+				currentOutPtr++
 				fromPtr++
 			} else {
 				// If we've processed all input characters from `from`, but the DFA hasn't found a match
 				// and is still asking for more input (i.e., `repPos.Found` is still false after processing `0`),
 				// it implies the current line doesn't lead to a match and we are at its end.
-				// This is the signal to exit the loop for this line.
-				// C's `*from++` would eventually hit the sentinel, and then the loop would terminate if no match.
-				// For Go, if `fromPtr == len(from)`, we've finished the input line.
-				// We don't want to copy a `0` to the output here, unless it's a genuine part of the match.
-				// The C code implicitly handles this by writing the `\n` or `\0` later.
-				break // Exit inner loop, next `if (!rep_str = ...)` will catch it.
+				// This is the signal to exit the entire `replaceStrings` loop for this line.
+				// The C code implies this when `*from++` becomes `0` and no match.
+				return currentOutPtr // No match found for the rest of the line, return current output length.
 			}
 		}
 
-		// A match or end of line reached. `repPos` is either a `ReplaceString` (found match) or a `Replace` state (no specific match found but consumed input).
-		// C: `if (!(rep_str = ((REPLACE_STRING*) rep_pos))->replace_string)`
-		// This cast implies that if `rep_pos` is a `REPLACE` struct itself, then `rep_pos->found` is false,
-		// and if `rep_pos` is a `REPLACE_STRING`, then `rep_pos->found` is true.
-		// The `Next` array should always point to a `*Replace` state or a `*ReplaceString`.
-		// The compiler will enforce the type if we don't use `interface{}`.
-		// Given `repPos` has `Found == true` here, it MUST be a `*ReplaceString`.
+		// A match or end of line reached. `repPos` is either a `*ReplaceString` (found match)
+		// or, if `repPos.Found` became true for a `*Replace` struct, it's an error.
+		// The DFA construction should ensure `Found == true` only for `*ReplaceString` or `rep` (base).
+
 		repString, isReplaceString := repPos.(*ReplaceString)
 
-		if !isReplaceString || repString.ReplaceString == "" { // Check if it's the sentinel (replaceString is empty)
+		// C: `if (!(rep_str = ((REPLACE_STRING*) rep_pos))->replace_string)`
+		if !isReplaceString || repString.ReplaceString == "" { // Check if it's the sentinel `ReplaceString`
 			// This means no replacement string was associated with this final state,
-			// or it's the `rep_str[0]` sentinel from `initReplace` indicating end of processing.
-			// C returns `(uint) (to - *start)-1;`
-			return currentOutLen // This is the length of processed part of the output buffer.
+			// or it's the `replaceStrings[0]` sentinel from `initReplace` indicating end of processing
+			// without a *specific* replacement.
+			return currentOutPtr // This is the length of processed part of the output buffer.
 		}
 
 		updated = 1 // Some char is replaced (C's updated=1)
 
 		// C: `to-=rep_str->to_offset;`
-		outPtr -= int(repString.ToOffset) // Adjust output pointer backward
+		currentOutPtr -= repString.ToOffset // Adjust output pointer backward
 
 		// Copy replacement string to output
 		// C: `for (pos=rep_str->replace_string; *pos ; pos++)`
-		for _, char := range repString.ReplaceString {
+		for _, charRune := range repString.ReplaceString { // Iterate over runes in Go string
+			char := byte(charRune) // Assuming single-byte characters like in original C code
 			// Check output buffer capacity
-			if outPtr >= outEnd {
+			if int(currentOutPtr) >= outBufferEndIdx {
 				*maxLength *= 2 // Double the output buffer size
 				newOut := make([]byte, *maxLength)
-				copy(newOut, (*out)[:outPtr])
+				copy(newOut, (*out)[:currentOutPtr])
 				*out = newOut
-				outEnd = int(*maxLength) - 1
+				outBufferEndIdx = int(*maxLength) - 1
 			}
-			(*out)[outPtr] = byte(char) // Copy character
-			outPtr++
+			(*out)[currentOutPtr] = char // Copy character
+			currentOutPtr++
 		}
 
 		// Adjust input pointer for the next scan.
 		// C: `if (!*(from-=rep_str->from_offset) && rep_pos->found != 2)`
-		fromPtr -= repString.FromOffset
-		if fromPtr < 0 { // Ensure fromPtr doesn't go negative
+		fromPtr -= repString.FromOffset // `from` pointer adjustment
+		if fromPtr < 0 {                // Ensure fromPtr doesn't go negative
 			fromPtr = 0
 		}
 
@@ -916,12 +939,12 @@ func replaceStrings(rep *Replace, out *[]byte, maxLength *uint, from []byte) uin
 		// If `fromPtr` reaches the end of the input `from` slice (current line content) AND
 		// the `repString.Found` flag is not 2 (which indicates `\^` only match that needs continuation).
 		if fromPtr >= len(from) && repString.Found != 2 {
-			return uint(outPtr) // Return actual length of processed output.
+			return currentOutPtr // Return actual length of processed output.
 		}
 
 		// Reset DFA state for next scan
 		// C: `rep_pos=rep;` (rep is the base address of the DFA states, points to rep[0])
-		repPos = rep.Next[0].(*Replace) // Reset to the initial state (assuming rep[0] is always the start state)
+		repPos = rep // Reset to the initial state (which is &replaces[0])
 	}
 }
 
@@ -983,8 +1006,8 @@ func convertPipe(rep *Replace, in io.Reader, out io.Writer) int {
 
 			// Pass the line content to `replaceStrings`.
 			// The `replaceStrings` function expects `from` as a byte slice.
-			// C: `if ((length=replace_strings(rep,&out_buff,&out_length,start_of_line)) == (uint) -1)`
-			lineContent := buffer[startOfLinePtr : endOfLinePtr-1] // Exclude the saved `\n` or `\0` for `replaceStrings`
+			// The `from` slice should be just the content, not including the newline/null.
+			lineContent := buffer[startOfLinePtr : endOfLinePtr-1]
 			length := replaceStrings(rep, &outBuff, &outLength, lineContent)
 			if length == math.MaxUint32 { // Error indicated by `math.MaxUint32` (-1 in C)
 				return 1
@@ -1026,22 +1049,15 @@ func convertFile(rep *Replace, name string) int {
 		err error
 	)
 
-	// Placeholder for C's `FN_REFLEN` and path manipulation
-	// `dir_buff`, `tempname`, `org_name`, `link_name` are C artifacts.
-	// Go uses `filepath.Dir`, `os.TempFile`, `os.Rename`.
-
 	orgName := name // Assuming name is the original path
 
 	// check if name is a symlink (C's #ifdef HAVE_READLINK)
-	// For Go, this is handled via `os.Readlink`
-	// C: `org_name= (!my_disable_symlinks && !my_readlink(link_name, name, MYF(0))) ? link_name : name;`
 	if !myDisableSymlinks { // Assuming myDisableSymlinks global is available (mocked to false)
 		if linkedPath, linkErr := os.Readlink(name); linkErr == nil {
 			orgName = linkedPath // Follow symlink
 		}
 	}
 
-	// C: `if (!(in= my_fopen(org_name,O_RDONLY,MYF(MY_WME))))`
 	in, err = os.Open(orgName)
 	if err != nil {
 		myMessage(MYF_MY_WME, "Failed to open input file %s: %v", orgName, err)
@@ -1049,8 +1065,6 @@ func convertFile(rep *Replace, name string) int {
 	}
 	defer in.Close() // Ensure input file is closed
 
-	// C: `dirname_part(dir_buff, org_name, &dir_buff_length);`
-	// C: `if ((temp_file= create_temp_file(tempname, dir_buff, "PR", O_WRONLY, MYF(MY_WME))) < 0)`
 	// Go's `os.CreateTemp` handles this more simply.
 	// It's good practice to create temp file in the same directory as original to allow atomic rename.
 	tempFile, err := os.CreateTemp(os.TempDir(), "PR_") // "PR_" prefix, default temp directory
@@ -1061,7 +1075,6 @@ func convertFile(rep *Replace, name string) int {
 	tempname := tempFile.Name() // Get the name of the temporary file
 	defer os.Remove(tempname)   // Ensure temp file is cleaned up if rename fails or exits early
 
-	// C: `if (!(out= my_fdopen(temp_file, tempname, O_WRONLY, MYF(MY_WME))))`
 	out = tempFile // os.CreateTemp returns *os.File, which can be used directly as a writer.
 
 	errorVal := convertPipe(rep, in, out) // Perform replacement
@@ -1093,11 +1106,8 @@ func convertFile(rep *Replace, name string) int {
 // --- Main function and general utilities ---
 
 // myMessage is a placeholder for C's my_message function.
-// In a real port, this would involve logging or user feedback.
 func myMessage(flags int, msg string, args ...interface{}) {
-	// For now, just print to stderr
 	fmt.Fprintf(os.Stderr, "Error: %s\n", fmt.Sprintf(msg, args...))
-	// C's ME_BELL might indicate an audible alert. Not implemented here.
 }
 
 // Dummy for `strcmp` from C's `string.h` for use in `getReplaceStrings`
@@ -1106,10 +1116,7 @@ func myStrcmp(s1, s2 string) int {
 }
 
 // Dummy for `my_isspace` from `m_ctype.h` for use in `main`.
-// This would ideally use `unicode.IsSpace` or be charset-aware.
 func myIsspace(charset interface{}, r rune) bool {
-	// Placeholder for now, assumes ASCII space characters.
-	// In a full port, this would need to handle the `my_charset_latin1` context.
 	return r == ' ' || r == '\t' || r == '\n' || r == '\r' || r == '\v' || r == '\f'
 }
 
@@ -1121,23 +1128,19 @@ var myProgname = "replace_strings" // Default, will be set in main
 
 // staticGetOptions translates C's `static_get_options`.
 func staticGetOptions(argc *int, argv *[]string) error {
-	// DBUG_ENTER("static_get_options");
-
 	help := 0
 	version := 0
 
 	args := *argv // Get the current slice of arguments
 
-	// Consume program name (argv[0])
 	myProgname = args[0]
 	args = args[1:]
-	*argc-- // Decrement argc
+	*argc--
 
-	// C loop: `while (--*argc > 0 && *(pos = *(++*argv)) == '-' && pos[1] != '-')`
 	i := 0
 	for i < len(args) && len(args[i]) > 1 && args[i][0] == '-' && args[i][1] != '-' {
 		pos := args[i]
-		for j := 1; j < len(pos); j++ { // Iterate through short options (e.g., -sv)
+		for j := 1; j < len(pos); j++ {
 			char := pos[j]
 			switch char {
 			case 's':
@@ -1145,19 +1148,15 @@ func staticGetOptions(argc *int, argv *[]string) error {
 			case 'v':
 				verbose = 1
 			case '#':
-				// C: DBUG_PUSH (++pos); pos= (char*) " ";
-				// For Go, if DBUG_PUSH is needed, it would be a call to a debug logger.
-				// We'll skip the rest of this arg.
-				j = len(pos) // Break inner loop
+				j = len(pos)
 			case 'V':
 				version = 1
-				fallthrough // Fallthrough to 'I'/'?' for help message
+				fallthrough
 			case 'I', '?':
 				help = 1
-				// C: printf("%s Ver 1.4 for %s at %s\n",my_progname,SYSTEM_TYPE,MACHINE_TYPE);
-				fmt.Printf("%s Ver 1.4 for %s at %s\n", myProgname, "GO_OS", "GO_ARCH") // Use Go env vars
+				fmt.Printf("%s Ver 1.4 for %s at %s\n", myProgname, "GO_OS", "GO_ARCH")
 				if version == 1 {
-					break // For 'V' (version only), break from printing full help
+					break
 				}
 				fmt.Println("This software comes with ABSOLUTELY NO WARRANTY. This is free software,\nand you are welcome to modify and redistribute it under the GPL license\n")
 				fmt.Println("This program replaces strings in files or from stdin to stdout.\n" +
@@ -1177,197 +1176,129 @@ func staticGetOptions(argc *int, argv *[]string) error {
 				fmt.Println("or")
 				fmt.Printf("Usage: %s [-?svIV] from to from to ... < fromfile > tofile\n", myProgname)
 				fmt.Println("\nOptions: -? or -I \"Info\"  -s \"silent\"     -v \"verbose\"")
-				// C: exit(0) typically happens after help/version
 				os.Exit(0)
 			default:
 				fmt.Fprintf(os.Stderr, "illegal option: -%c\n", char)
 				return fmt.Errorf("illegal option: -%c", char)
 			}
 		}
-		i++ // Move to next arg
+		i++
 	}
-	// Update argv and argc to reflect consumed options
 	*argv = args[i:]
 	*argc = len(*argv)
 
-	if *argc == 0 { // C: `if (*argc == 0)`
-		if help == 0 { // If help wasn't printed (meaning no options were given at all)
+	if *argc == 0 {
+		if help == 0 {
 			myMessage(0, "No replace options given", MYF_ME_BELL)
 		}
-		os.Exit(0) // C: exit(0); Don't use as pipe
+		os.Exit(0)
 	}
 	return nil
 }
 
 // getReplaceStrings translates C's `get_replace_strings`.
 func getReplaceStrings(argc *int, argv *[]string, fromArray, toArray *PointerArray) error {
-	// C: `bzero((char*) from_array,sizeof(from_array[0]));`
-	// C: `bzero((char*) to_array,sizeof(to_array[0]));`
-	// In Go, if these are new structs, they are zero-valued.
-	// If reused, `*fromArray = PointerArray{}` would re-zero them.
-
-	args := *argv // Current slice of arguments
+	args := *argv
 
 	i := 0
-	// C loop: `while (*argc > 0 && (*(pos = *(*argv)) != '-' || pos[1] != '-' || pos[2]))`
-	// This loop processes arguments until `--` is encountered or no more args.
 	for i < len(args) {
 		pos := args[i]
-		if len(pos) >= 2 && pos[0] == '-' && pos[1] == '-' { // Check for `--`
-			if len(pos) == 2 { // Exactly "--"
-				break // End of from/to pairs, rest are files
+		if len(pos) >= 2 && pos[0] == '-' && pos[1] == '-' {
+			if len(pos) == 2 {
+				break
 			}
-			// If it's "--something", it's treated as a normal argument, not option end
 		}
 
-		// Insert from-string
 		err := fromArray.insertPointerName(pos)
 		if err != nil {
 			return err
 		}
-		i++ // Consume from-string arg
+		i++
 		*argc--
 
-		// Check for to-string
-		if i >= len(args) || (len(args[i]) == 2 && args[i][0] == '-' && args[i][1] == '-') { // No more args or it's `--`
+		if i >= len(args) || (len(args[i]) == 2 && args[i][0] == '-' && args[i][1] == '-') {
 			myMessage(0, "No to-string for last from-string", MYF_ME_BELL)
 			return fmt.Errorf("missing to-string for last from-string")
 		}
 
-		// Insert to-string
 		err = toArray.insertPointerName(args[i])
 		if err != nil {
 			return err
 		}
-		i++ // Consume to-string arg
+		i++
 		*argc--
 	}
 
-	// C: `if (*argc) { (*argc)--; (*argv)++; }` // Skip "--" argument
 	if i < len(args) && len(args[i]) == 2 && args[i][0] == '-' && args[i][1] == '-' {
-		i++ // Skip `"--"`
+		i++
 		*argc--
 	}
 
-	*argv = args[i:] // Update argv to point to remaining args (files)
+	*argv = args[i:]
 	return nil
 }
 
 // --- Main Program ---
 func main() {
-	// C: `MY_INIT(argv[0]);`
-	// Go's `os.Args[0]` is the program name.
 	myInit(os.Args[0])
 
-	args := os.Args // Original command-line arguments including program name
+	args := os.Args
 	argc := len(args)
 
-	// C: `if (static_get_options(&argc,&argv))`
 	if err := staticGetOptions(&argc, &args); err != nil {
-		os.Exit(1) // Exit on option parsing error
+		os.Exit(1)
 	}
 
-	// C: `if (get_replace_strings(&argc,&argv,&from,&to))`
 	var fromArray, toArray PointerArray
 	if err := getReplaceStrings(&argc, &args, &fromArray, &toArray); err != nil {
-		os.Exit(1) // Exit on replacement string parsing error
+		os.Exit(1)
 	}
 
-	// C: Prepare `word_end_chars`
-	// C: `for (i=1,pos=word_end_chars ; i < 256 ; i++) if (my_isspace(&my_charset_latin1,i)) *pos++= (char) i;`
-	// C: `*pos=0;`
 	var wordEndCharsBuffer bytes.Buffer
 	for i := 1; i < 256; i++ {
-		// Assuming my_charset_latin1 means standard ASCII spaces.
-		// If real charset handling is needed, `unicode.IsSpace` is better but works on runes.
-		// For C's `my_isspace` (which is char-based), basic ASCII check is sufficient here.
-		if myIsspace(nil, rune(i)) { // Pass nil for charset for dummy function
+		if myIsspace(nil, rune(i)) {
 			wordEndCharsBuffer.WriteByte(byte(i))
 		}
 	}
-	wordEndChars := wordEndCharsBuffer.String() // Get as a string
+	wordEndChars := wordEndCharsBuffer.String()
 
-	// C: `if (!(replace=init_replace((char**) from.typelib.type_names, ...)))`
 	replace, err := initReplace(fromArray.Typelib.TypeNames, toArray.Typelib.TypeNames, fromArray.Typelib.Count, wordEndChars)
 	if err != nil {
-		log.Fatalf("Error initializing replacement: %v", err) // Use log.Fatalf for critical errors
-		os.Exit(1)                                            // Should be caught by log.Fatalf, but for clarity
+		log.Fatalf("Error initializing replacement: %v", err)
+		os.Exit(1)
 	}
 
-	// C: `free_pointer_array(&from); free_pointer_array(&to);`
 	fromArray.freePointerArray()
 	toArray.freePointerArray()
 
-	// C: `if (initialize_buffer())`
 	if err := initializeBuffer(); err != nil {
 		log.Fatalf("Error initializing buffers: %v", err)
 		os.Exit(1)
 	}
-	defer freeBuffer() // Ensure buffers are freed at the end of main
+	defer freeBuffer()
 
-	errorResult := 0 // C's error variable
+	errorResult := 0
 
-	// C: `if (argc == 0) error=convert_pipe(replace,stdin,stdout);`
-	if argc == 0 { // If no file arguments (meaning input from stdin)
+	if argc == 0 {
 		errorResult = convertPipe(replace, os.Stdin, os.Stdout)
 	} else {
-		// C: `while (argc--) { error=convert_file(replace,*(argv++)); }`
-		for _, fileName := range args { // args now contains only file names
+		for _, fileName := range args {
 			if err := convertFile(replace, fileName); err != 0 {
-				errorResult = err // Keep the last error, or aggregate
-				break             // Stop processing on first file error
+				errorResult = err
+				break
 			}
 		}
 	}
 
-	// C: `my_end(verbose ? MY_CHECK_ERROR | MY_GIVE_INFO : MY_CHECK_ERROR);`
-	// C: `exit(error ? 2 : 0);`
 	flags := MY_CHECK_ERROR
 	if verbose != 0 {
 		flags |= MY_GIVE_INFO
 	}
-	myEnd(flags) // Call cleanup/info function
+	myEnd(flags)
 
 	if errorResult != 0 {
-		os.Exit(2) // C's exit code for errors
+		os.Exit(2)
 	} else {
-		os.Exit(0) // Success
+		os.Exit(0)
 	}
-	// return 0; // Not reachable in Go after os.Exit
 }
-
-// --- Other Utility Definitions ---
-
-// C's DBUG_PUSH (from mysys.h) is typically for MySQL's internal debugging.
-// For Go, this would be a custom debug logging setup. Not porting fully.
-// The C code had: DBUG_PUSH (++pos); pos= (char*) " "; /* Skip rest of arguments */
-// This line implies it consumes the rest of the current argument as debug flags.
-// We'll just skip the rest of the argument for now.
-
-// C's my_init
-func myInit(progname string) {
-	myProgname = progname
-	log.SetPrefix(progname + ": ")
-	log.SetFlags(0) // No timestamp by default, adjust as needed
-}
-
-// C's my_end
-func myEnd(flags int) {
-	if (flags&MY_CHECK_ERROR) != 0 && updated != 0 {
-		if verbose != 0 {
-			fmt.Println("Program finished with updates.")
-		}
-	}
-	// In Go, defer statements handle resource cleanup; os.Exit terminates.
-}
-
-// Placeholder for C's MYF flags
-const (
-	MYF_ME_BELL     = 1 << 0
-	MYF_MY_WME      = 1 << 1
-	MYF_MY_NABP     = 1 << 2
-	MYF_ZEROFILL    = 1 << 3
-	MY_CHECK_ERROR  = 1 << 4
-	MY_GIVE_INFO    = 1 << 5
-	MY_LINK_WARNING = 1 << 6
-)

@@ -30,3 +30,10 @@ Retry with Gemini.
 > Porting this code will be a significant effort, especially the DFA
 > construction and string replacement logic, but it's a good learning exercise
 > for understanding Go's idioms and memory model compared to C. **Good luck!**
+
+## Notes
+
+### Canvas
+
+In canvas mode, gemini will compile the code and will feed error messages back,
+seemingly until the compilation succeeds. It is like a small in chat agent.
