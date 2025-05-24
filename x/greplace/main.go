@@ -1,10 +1,11 @@
 package main
 
 import (
+	// For bytes.Compare, similar to memcmp
 	"fmt"
-	"log" // For error logging
+	"log"
 	"os"
-	"strings" // For string manipulation functions like strings.Compare, len, etc.
+	"strings"
 )
 
 // --- Constants ---
@@ -15,7 +16,7 @@ const (
 	StartOfLine   = 257
 	EndOfLine     = 258
 	LastCharCode  = 259
-	WordBit       = 32
+	WordBit       = 32 // Assuming 32-bit uint
 	SetMallocHunc = 64
 )
 
@@ -95,57 +96,32 @@ var (
 	foundSets uint = 0
 )
 
-// --- Functions related to PointerArray ---
+// --- Functions related to PointerArray (from previous step) ---
 
-// insertPointerName translates C's `insert_pointer_name`.
-// It appends a new string `name` to the PointerArray.
-// It handles dynamic resizing of the underlying string data and pointer/flag arrays.
 func (pa *PointerArray) insertPointerName(name string) error {
-	// DBUG_ENTER("insert_pointer_name"); // Go equivalent: use log or specific debug flags
-
-	// Equivalent of `if (! pa->typelib.count)`
 	if pa.Typelib.Count == 0 {
-		// Calculate initial capacity based on PC_MALLOC and approximate sizes.
-		// Go's slices handle much of this automatically, but we can set an initial
-		// capacity that roughly aligns with the C approach to avoid too many reallocations initially.
-		// sizeof(char*) + sizeof(*pa->flag) is about 8+1 bytes on 64-bit, so ~9 bytes per entry.
-		// We can directly use `PcMalloc` to determine an initial reasonable capacity for the slice.
-		initialCapacity := PcMalloc / (8 + 1) // Rough estimate for pointer size + flag size in C
+		initialCapacity := PcMalloc / (8 + 1)
 		if initialCapacity == 0 {
-			initialCapacity = 1 // Ensure at least 1 capacity if calculation leads to 0
+			initialCapacity = 1
 		}
-
-		// Initialize Typelib.TypeNames and Flag slices with capacity
 		pa.Typelib.TypeNames = make([]string, 0, initialCapacity)
 		pa.Flag = make([]uint8, 0, initialCapacity)
-
-		// Initialize Str (the byte buffer for string data)
-		pa.Str = make([]byte, 0, PsMalloc) // Initial capacity for string data
+		pa.Str = make([]byte, 0, PsMalloc)
 		pa.MaxLength = PsMalloc
-
-		pa.MaxCount = uint(initialCapacity) // Track C's max_count for conceptual consistency
+		pa.MaxCount = uint(initialCapacity)
 		pa.Length = 0
 		pa.ArrayAllocs = 1
 	}
 
-	length := uint(len(name)) + 1 // +1 for the null terminator, mirroring C's `strlen(name)+1`
+	length := uint(len(name)) + 1
 
-	// Equivalent of `if (pa->length+length >= pa->max_length)`
-	// In Go, `append` handles slice resizing. We can pre-allocate `Str` if needed.
 	if pa.Length+length > pa.MaxLength {
-		// C's reallocation logic: (pa->length+length+MALLOC_OVERHEAD+PS_MALLOC-1)/PS_MALLOC * PS_MALLOC - MALLOC_OVERHEAD
-		// Simplified for Go: just increase MaxLength by a chunk or double it.
-		// Let's mirror the C logic for `max_length` calculation for now.
 		newMaxLength := (pa.Length + length + PsMalloc - 1) / PsMalloc * PsMalloc
-		if newMaxLength < pa.MaxLength { // Avoid shrinking, and ensure minimum increase
-			newMaxLength = pa.MaxLength * 2 // Fallback to doubling if calculated is smaller
+		if newMaxLength < pa.MaxLength {
+			newMaxLength = pa.MaxLength * 2
 		}
 		pa.MaxLength = newMaxLength
 
-		// Reallocate `pa.Str`. In Go, this means creating a new slice with new capacity
-		// and copying old data. The `append` function does this automatically when capacity is exceeded.
-		// For explicit pre-allocation similar to `realloc`, we can resize `pa.Str` here
-		// before appending the new string.
 		if cap(pa.Str) < int(pa.MaxLength) {
 			newStr := make([]byte, len(pa.Str), pa.MaxLength)
 			copy(newStr, pa.Str)
@@ -153,23 +129,14 @@ func (pa *PointerArray) insertPointerName(name string) error {
 		}
 	}
 
-	// Equivalent of `if (pa->typelib.count >= pa->max_count-1)`
-	// Go's append handles resizing `TypeNames` and `Flag`.
-	// C's `PC_MALLOC*pa->array_allocs` logic for increasing `max_count` can be simulated.
-	if pa.Typelib.Count >= pa.MaxCount-1 { // -1 because C checks `max_count-1`
+	if pa.Typelib.Count >= pa.MaxCount-1 {
 		pa.ArrayAllocs++
-		// Calculate new MaxCount based on C's PC_MALLOC scaling.
-		// len_calc = (PC_MALLOC*pa->array_allocs - MALLOC_OVERHEAD) / (sizeof(uchar*)+sizeof(*pa->flag))
-		newMaxCount := (PcMalloc * pa.ArrayAllocs) / (8 + 1) // Approx (8 for ptr, 1 for flag)
-		if newMaxCount <= pa.MaxCount {                      // Ensure it actually increases
+		newMaxCount := (PcMalloc * pa.ArrayAllocs) / (8 + 1)
+		if newMaxCount <= pa.MaxCount {
 			newMaxCount = pa.MaxCount * 2
 		}
 		pa.MaxCount = newMaxCount
 
-		// Resize Typelib.TypeNames and Flag slices.
-		// In Go, it's more idiomatic to let append handle this.
-		// However, to mimic C's explicit realloc and memcpy for `flag`,
-		// we can do a similar pre-allocation and copy if needed.
 		if cap(pa.Typelib.TypeNames) < int(pa.MaxCount) {
 			newTypeNames := make([]string, len(pa.Typelib.TypeNames), pa.MaxCount)
 			copy(newTypeNames, pa.Typelib.TypeNames)
@@ -181,189 +148,216 @@ func (pa *PointerArray) insertPointerName(name string) error {
 		}
 	}
 
-	pa.Flag = append(pa.Flag, 0) // Reset flag for new entry
-	// Append the new string to TypeNames slice
+	pa.Flag = append(pa.Flag, 0)
 	pa.Typelib.TypeNames = append(pa.Typelib.TypeNames, name)
-	pa.Typelib.Count++ // Increment count after appending
+	pa.Typelib.Count++
 
-	// In C, `strmov` copies the string into `pa->str`.
-	// In Go, we append the bytes of the string to `pa.Str`.
 	pa.Str = append(pa.Str, []byte(name)...)
-	pa.Str = append(pa.Str, 0) // Add null terminator (for C-like string processing later)
+	pa.Str = append(pa.Str, 0)
 	pa.Length += length
 
-	// DBUG_RETURN(0); // Go equivalent: return nil for success
 	return nil
 }
 
-// freePointerArray translates C's `free_pointer_array`.
-// It effectively clears the slices, allowing the garbage collector to reclaim memory.
 func (pa *PointerArray) freePointerArray() {
 	if pa.Typelib.Count > 0 {
 		pa.Typelib.Count = 0
-		// Release underlying arrays to GC by re-slicing to nil or zero-length.
 		pa.Typelib.TypeNames = nil
 		pa.Str = nil
 		pa.Flag = nil
 	}
-	// `pa.typelib.type_names=0;` in C indicates a null pointer, which is `nil` in Go.
-	// `my_free(pa->str);` means releasing the memory, also handled by `nil` slices in Go.
-	// DBUG_RETURN; // Go equivalent: just return
 	return
 }
 
-// myMessage is a placeholder for C's my_message function.
-// In a real port, this would involve logging or user feedback.
-func myMessage(flags int, msg string, args ...interface{}) {
-	// For now, just print to stderr
-	fmt.Fprintf(os.Stderr, "Error: %s\n", fmt.Sprintf(msg, args...))
-	// C's ME_BELL might indicate an audible alert. Not implemented here.
+// --- Bit Manipulation Functions (Methods on *RepSet) ---
+
+// internalSetBit translates C's `internal_set_bit`.
+// Sets the specified bit in the RepSet's bitset.
+func (rs *RepSet) internalSetBit(bit uint) {
+	// `set->bits[bit / WORD_BIT] |= 1 << (bit % WORD_BIT);`
+	rs.Bits[bit/WordBit] |= (1 << (bit % WordBit))
 }
 
-// Dummy for `strcmp` from C's `string.h` for use in `getReplaceStrings`
+// internalClearBit translates C's `internal_clear_bit`.
+// Clears the specified bit in the RepSet's bitset.
+func (rs *RepSet) internalClearBit(bit uint) {
+	// `set->bits[bit / WORD_BIT] &= ~ (1 << (bit % WORD_BIT));`
+	rs.Bits[bit/WordBit] &^= (1 << (bit % WordBit)) // `&^=` is Go's bit clear operator
+}
+
+// orBits translates C's `or_bits`.
+// Performs a bitwise OR operation from `from` RepSet's bits into `to` RepSet's bits.
+func (to *RepSet) orBits(from *RepSet) {
+	// `to->size_of_bits` and `from->size_of_bits` should be the same.
+	// We'll iterate up to `to.SizeOfBits`.
+	for i := uint(0); i < to.SizeOfBits; i++ {
+		to.Bits[i] |= from.Bits[i]
+	}
+}
+
+// copyBits translates C's `copy_bits`.
+// Copies the bitset from `from` RepSet to `to` RepSet.
+func (to *RepSet) copyBits(from *RepSet) {
+	// `memcpy((uchar*) to->bits,(uchar*) from->bits, (size_t) (sizeof(uint) * to->size_of_bits));`
+	// In Go, simply use the `copy` built-in function for slices.
+	// Make sure `to.Bits` has enough capacity/length.
+	copy(to.Bits, from.Bits)
+}
+
+// cmpBits translates C's `cmp_bits`.
+// Compares the bitsets of two RepSets.
+// Returns 0 if equal, non-zero otherwise (following C's memcmp behavior).
+func cmpBits(set1, set2 *RepSet) int {
+	// `memcmp(set1->bits, set2->bits, sizeof(uint) * set1->size_of_bits);`
+	// In Go, `bytes.Compare` can be used for byte slices. For `[]uint`, we'll
+	// manually compare or convert to byte slices for `bytes.Compare`.
+	// For simplicity, let's convert to `[]byte` then use `bytes.Compare`.
+	// A more direct `for` loop comparison is also possible.
+	// Given they are `[]uint`, direct comparison is clearer.
+
+	// Check if sizes are equal (important for comparison)
+	if set1.SizeOfBits != set2.SizeOfBits || len(set1.Bits) != len(set2.Bits) {
+		// This case shouldn't ideally happen if `SizeOfBits` is consistent,
+		// but `memcmp` relies on the byte count.
+		// A difference in size means they are not equal.
+		return 1 // Not equal
+	}
+
+	for i := uint(0); i < set1.SizeOfBits; i++ {
+		if set1.Bits[i] != set2.Bits[i] {
+			return 1 // Found a difference
+		}
+	}
+	return 0 // All bits are equal
+}
+
+// getNextBit translates C's `get_next_bit`.
+// Returns the index of the next set bit in the RepSet's bitset, starting after `lastPos`.
+// Returns 0 if no more bits are set.
+func (rs *RepSet) getNextBit(lastPos uint) uint {
+	// `uint pos,*start,*end,bits;`
+	// `start=set->bits+ ((lastpos+1) / WORD_BIT);`
+	// `end=set->bits + set->size_of_bits;`
+	// `bits=start[0] & ~((1 << ((lastpos+1) % WORD_BIT)) -1);`
+
+	startIdx := (lastPos + 1) / WordBit
+	if startIdx >= rs.SizeOfBits { // If lastPos was already at or beyond the end
+		return 0
+	}
+
+	var bits uint
+	// Calculate initial `bits` value based on `start[0]` and mask
+	mask := ^uint(0) // All bits set
+	if (lastPos+1)%WordBit != 0 {
+		mask &^= ((1 << ((lastPos + 1) % WordBit)) - 1) // Clear bits up to (lastPos+1)%WordBit
+	}
+	bits = rs.Bits[startIdx] & mask
+
+	currentBitIdx := startIdx * WordBit // The logical start of the current `uint` in the bitset
+
+	// `while (! bits && ++start < end)`
+	for bits == 0 {
+		startIdx++
+		currentBitIdx = startIdx * WordBit
+		if startIdx >= rs.SizeOfBits {
+			return 0 // No more set bits
+		}
+		bits = rs.Bits[startIdx]
+	}
+
+	// `pos=(uint) (start-set->bits)*WORD_BIT;`
+	// `while (! (bits & 1))`
+	// `{ bits>>=1; pos++; }`
+	// `return pos;`
+
+	// Find the position of the first set bit within `bits`
+	bitOffsetInWord := uint(0)
+	for (bits & 1) == 0 {
+		bits >>= 1
+		bitOffsetInWord++
+	}
+
+	return currentBitIdx + bitOffsetInWord
+}
+
+// --- Other functions (from previous steps, placeholders) ---
+
+func myMessage(flags int, msg string, args ...interface{}) {
+	fmt.Fprintf(os.Stderr, "Error: %s\n", fmt.Sprintf(msg, args...))
+}
+
 func myStrcmp(s1, s2 string) int {
 	return strings.Compare(s1, s2)
 }
 
-// Dummy for `my_isspace` from `m_ctype.h` for use in `main`.
-// This would ideally use `unicode.IsSpace` or be charset-aware.
 func myIsspace(charset interface{}, r rune) bool {
-	// Placeholder for now, assumes ASCII space characters.
-	// In a full port, this would need to handle the `my_charset_latin1` context.
 	return r == ' ' || r == '\t' || r == '\n' || r == '\r' || r == '\v' || r == '\f'
 }
 
-// main function (placeholder for now, will be filled in later)
 func main() {
-	// This will be filled in during subsequent steps
-	// Example usage (for testing purposes during porting):
-	// var fromArray, toArray PointerArray
-	// err := fromArray.insertPointerName("test_from_1")
-	// if err != nil {
-	// 	log.Fatalf("Error inserting name: %v", err)
+	// Example usage for testing bit manipulation:
+	// var rs RepSet
+	// rs.SizeOfBits = 2 // For example, 2 uints, covering up to 64 bits (2 * 32)
+	// rs.Bits = make([]uint, rs.SizeOfBits) // Allocate the bits slice
+
+	// rs.internalSetBit(5)  // Set bit 5
+	// rs.internalSetBit(32) // Set bit 32 (should be in the second uint)
+	// rs.internalSetBit(33) // Set bit 33
+
+	// fmt.Printf("Bits after setting 5, 32, 33: %b %b\n", rs.Bits[0], rs.Bits[1])
+
+	// next := rs.getNextBit(0)
+	// fmt.Printf("Next set bit after 0: %d\n", next) // Should be 5
+	// next = rs.getNextBit(5)
+	// fmt.Printf("Next set bit after 5: %d\n", next) // Should be 32
+	// next = rs.getNextBit(32)
+	// fmt.Printf("Next set bit after 32: %d\n", next) // Should be 33
+	// next = rs.getNextBit(33)
+	// fmt.Printf("Next set bit after 33: %d\n", next) // Should be 0 (no more)
+
+	// rs.internalClearBit(5) // Clear bit 5
+	// fmt.Printf("Bits after clearing 5: %b %b\n", rs.Bits[0], rs.Bits[1])
+	// next = rs.getNextBit(0)
+	// fmt.Printf("Next set bit after 0 (after clearing 5): %d\n", next) // Should be 32
+
+	// var rs2 RepSet
+	// rs2.SizeOfBits = 2
+	// rs2.Bits = make([]uint, rs2.SizeOfBits)
+	// rs2.internalSetBit(32)
+	// rs2.internalSetBit(33)
+	// fmt.Printf("rs2 Bits: %b %b\n", rs2.Bits[0], rs2.Bits[1])
+
+	// if cmpBits(&rs, &rs2) == 0 {
+	// 	fmt.Println("rs and rs2 are equal (should not be)")
+	// } else {
+	// 	fmt.Println("rs and rs2 are not equal (correct)")
 	// }
-	// fmt.Printf("From array count: %d, length: %d\n", fromArray.Typelib.Count, fromArray.Length)
-	// fromArray.freePointerArray()
-	// fmt.Printf("From array count after free: %d\n", fromArray.Typelib.Count)
+
+	// rs.orBits(&rs2)
+	// fmt.Printf("rs Bits after OR with rs2: %b %b\n", rs.Bits[0], rs.Bits[1]) // Should now have 32, 33
 }
 
-// --- Other functions from C code (placeholders for now) ---
-
-// static_get_options -> staticGetOptions
-func staticGetOptions(args []string) ([]string, error) {
-	// Placeholder: will parse command-line options
-	// For now, return original args and no error.
+// ... (other placeholder functions like staticGetOptions, getReplaceStrings, etc.)
+func staticGetOptions(args []string) ([]string, error) { return args, nil }
+func getReplaceStrings(args []string, fromArray, toArray *PointerArray) ([]string, error) {
 	return args, nil
 }
-
-// get_replace_strings -> getReplaceStrings
-func getReplaceStrings(args []string, fromArray, toArray *PointerArray) ([]string, error) {
-	// bzero((char*) from_array,sizeof(from_array[0]));
-	// bzero((char*) to_array,sizeof(to_array[0]));
-	// In Go, structs are zero-valued by default when declared,
-	// so explicit bzero for the struct itself is not needed if they are new.
-	// If re-using, `*fromArray = PointerArray{}` would re-zero.
-
-	// The `while` loop processes from/to pairs
-	i := 0
-	for i < len(args) {
-		arg := args[i]
-		if len(arg) > 1 && arg[0] == '-' && arg[1] == '-' && len(arg) == 2 {
-			// This matches `--` which signifies end of options
-			break
-		}
-
-		// Insert from-string
-		err := fromArray.insertPointerName(arg)
-		if err != nil {
-			return nil, err
-		}
-		i++ // Move to the next argument
-
-		// Check if a to-string exists
-		if i >= len(args) || myStrcmp(args[i], "--") == 0 {
-			myMessage(0, "No to-string for last from-string")
-			return nil, fmt.Errorf("missing to-string")
-		}
-
-		// Insert to-string
-		err = toArray.insertPointerName(args[i])
-		if err != nil {
-			return nil, err
-		}
-		i++ // Move to the next argument
-	}
-
-	if i < len(args) && myStrcmp(args[i], "--") == 0 {
-		// Skip "--" argument
-		i++
-	}
-
-	return args[i:], nil // Return remaining args (files)
-}
-
-// init_replace -> initReplace (will be a complex function)
 func initReplace(from []string, to []string, count uint, wordEndChars []byte) (*Replace, error) {
-	// Placeholder for the complex DFA initialization
 	return nil, nil
 }
-
-// initialize_buffer -> initializeBuffer
-func initializeBuffer() error {
-	bufRead = 8192
-	bufAlloc = uint(bufRead + bufRead/2) // C's bufalloc = bufread + bufread/2
-	buffer = make([]byte, bufAlloc+1)    // +1 for sentinel
-	bufBytes = 0
-	myEOF = 0
-
-	outLength = uint(bufRead)
-	outBuff = make([]byte, outLength)
-	if outBuff == nil {
-		return fmt.Errorf("failed to allocate out_buff")
-	}
-	return nil
-}
-
-// convert_pipe -> convertPipe
-func convertPipe(rep *Replace, in *os.File, out *os.File) error {
-	// Placeholder
-	return nil
-}
-
-// convert_file -> convertFile
-func convertFile(rep *Replace, name string) error {
-	// Placeholder
-	return nil
-}
-
-// free_buffer -> freeBuffer
-func freeBuffer() {
-	buffer = nil
-	outBuff = nil
-}
-
-// my_init -> myInit (Placeholder, typically not needed in Go)
-func myInit(progname string) {
-	// C's MY_INIT might set up signal handlers or debug logging.
-	// In Go, this would usually be handled by standard library calls or custom setup.
-	log.SetPrefix(progname + ": ")
-	log.SetFlags(0) // No timestamp by default, adjust as needed
-}
-
-// my_end -> myEnd (Placeholder, Go programs exit cleanly)
+func initializeBuffer() error                                   { return nil }
+func convertPipe(rep *Replace, in *os.File, out *os.File) error { return nil }
+func convertFile(rep *Replace, name string) error               { return nil }
+func freeBuffer()                                               {}
+func myInit(progname string)                                    { log.SetPrefix(progname + ": "); log.SetFlags(0) }
 func myEnd(flags int) {
-	// C's my_end might do resource cleanup or print final stats.
-	// In Go, deferred calls or the garbage collector usually handle cleanup.
-	// `flags` might indicate error checking or info output.
 	if (flags&MY_CHECK_ERROR) != 0 && updated != 0 {
 		if verbose != 0 {
 			fmt.Println("Program finished with updates.")
 		}
 	}
-	// os.Exit(0) or os.Exit(1) would be used in actual main.
 }
 
-// Placeholder for C's MYF flags
 const (
 	MYF_ME_BELL     = 1 << 0
 	MYF_MY_WME      = 1 << 1
@@ -373,20 +367,3 @@ const (
 	MY_GIVE_INFO    = 1 << 5
 	MY_LINK_WARNING = 1 << 6
 )
-
-// Placeholder for create_temp_file, dirname_part, my_readlink, my_disable_symlinks etc.
-// These would involve `os` and `io/ioutil` functions.
-// For now, let's keep them as comments or minimal placeholders.
-/*
-func createTempFile(...) (int, error) { return 0, nil }
-func dirnamePart(...) {}
-func myReadlink(...) (string, error) { return "", nil }
-var myDisableSymlinks bool = false
-func myFopen(...) (*os.File, error) { return nil, nil }
-func myFdopen(...) (*os.File, error) { return nil, nil }
-func myFwrite(...) (int, error) { return 0, nil }
-func myFclose(...) error { return nil }
-func myRedel(...) error { return nil }
-func myDelete(...) error { return nil }
-func myFileno(...) int { return 0 }
-*/
