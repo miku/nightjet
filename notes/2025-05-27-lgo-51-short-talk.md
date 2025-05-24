@@ -5,7 +5,7 @@
 ## Motivation
 
 * not really convinced, but tried to make a more systematic effort to use
-  coding tools since 01/2025 - and to document the process:
+  coding tools since BOY 2025 - and to try to document the process:
 [nightjet](https://github.com/miku/nightjet)
 
 Testing various open models.
@@ -39,8 +39,9 @@ Testing various open models.
 ## TL;DR
 
 * so far, both: HITS and MISSES
-* feels like early Stack Overflow, helpful to fill in missing pieces; augmentation to docs
+* feels like early Stack Overflow (SO), helpful to fill in missing pieces; augmentation to docs
 * throwaway code, prototypes, able to skip stuff I am not interested in
+* just like SO, it's all fine as long as you understand every line (up to some granularity)
 
 ## trcli
 
@@ -86,6 +87,5 @@ $ git diff --stat 0a5555b4 -- harvest.go client.go cmd/metha-sync/main.go
  2 files changed, 60 insertions(+), 7 deletions(-)
 ```
 
-
-
+## replace.c port to Go
 
