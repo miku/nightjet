@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"os"
 	"strings"
 )
 
@@ -244,37 +245,14 @@ func (re *ReplacementEngine) getNextState(stateIndex int, char int) (int, error)
 	return nextState, nil
 }
 
-// ReplaceReader performs replacement on data from a reader, writing to a writer
+// Update the original ReplacementEngine to use streaming for large inputs
 func (re *ReplacementEngine) ReplaceReader(reader io.Reader, writer io.Writer) (bool, error) {
-	re.updated = false
+	// Create streaming engine for memory efficiency
+	streamEngine := NewStreamingReplacementEngine(re.dfa, re.patterns)
 
-	// Read input in chunks
-	buffer := make([]byte, 8192)
-	var accumulated []byte
-
-	for {
-		n, err := reader.Read(buffer)
-		if n > 0 {
-			accumulated = append(accumulated, buffer[:n]...)
-		}
-
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			return false, fmt.Errorf("error reading input: %v", err)
-		}
-	}
-
-	// Process the accumulated data
-	result, updated, err := re.ReplaceString(string(accumulated))
+	updated, err := streamEngine.ReplaceStream(reader, writer)
 	if err != nil {
 		return false, err
-	}
-
-	// Write the result
-	_, writeErr := writer.Write([]byte(result))
-	if writeErr != nil {
-		return false, fmt.Errorf("error writing output: %v", writeErr)
 	}
 
 	re.updated = updated
@@ -465,4 +443,28 @@ func (cr *CompleteReplacer) GetStats() map[string]interface{} {
 	stats := cr.engine.GetStats()
 	stats["compiled"] = true
 	return stats
+}
+
+// Optional: Add a method to process files in streaming mode
+func (cr *CompleteReplacer) ReplaceFileStreaming(inputPath, outputPath string) (bool, error) {
+	if cr.engine == nil {
+		return false, fmt.Errorf("replacer not compiled - call Compile() first")
+	}
+
+	// Open input file
+	input, err := os.Open(inputPath)
+	if err != nil {
+		return false, fmt.Errorf("cannot open input file: %v", err)
+	}
+	defer input.Close()
+
+	// Create output file
+	output, err := os.Create(outputPath)
+	if err != nil {
+		return false, fmt.Errorf("cannot create output file: %v", err)
+	}
+	defer output.Close()
+
+	// Use streaming replacement
+	return cr.ReplaceReader(input, output)
 }

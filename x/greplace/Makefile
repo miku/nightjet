@@ -2,7 +2,7 @@ SHELL = /bin/bash
 GO_FILES = $(shell find . -name "*.go" -type f)
 
 greplace: $(GO_FILES)
-	go build -o greplace greplace.go bitset.go pattern.go dfa.go replace.go
+	go build -o greplace greplace.go bitset.go pattern.go dfa.go replace.go streaming.go
 
 .PHONY: test
 test:

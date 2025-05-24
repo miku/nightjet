@@ -135,58 +135,51 @@ func processStream(replacer *CompleteReplacer, input io.Reader, output io.Writer
 	return nil
 }
 
-// processFile handles individual file processing with atomic replacement
+// Updated processFile function for memory-efficient file processing
 func processFile(replacer *CompleteReplacer, filename string, silent, verbose bool) error {
-	// Read the entire file
+	// Open input file
 	input, err := os.Open(filename)
 	if err != nil {
 		return fmt.Errorf("cannot open %s: %v", filename, err)
 	}
 	defer input.Close()
 
-	// Read file content
-	content, err := io.ReadAll(input)
+	// Get file info for permissions
+	info, err := input.Stat()
 	if err != nil {
-		return fmt.Errorf("cannot read %s: %v", filename, err)
+		return fmt.Errorf("cannot stat %s: %v", filename, err)
 	}
 
-	// Perform replacement
-	result, updated, err := replacer.Replace(string(content))
+	// Create temporary file in the same directory
+	dir := getDir(filename)
+	tempFile, err := os.CreateTemp(dir, ".greplace_temp_*")
+	if err != nil {
+		return fmt.Errorf("cannot create temp file for %s: %v", filename, err)
+	}
+	tempName := tempFile.Name()
+
+	// Ensure cleanup on any error
+	defer func() {
+		tempFile.Close()
+		if err != nil {
+			os.Remove(tempName)
+		}
+	}()
+
+	// Use streaming replacement to avoid loading entire file into memory
+	updated, err := replacer.ReplaceReader(input, tempFile)
 	if err != nil {
 		return fmt.Errorf("replacement failed for %s: %v", filename, err)
 	}
 
+	// Close temp file before rename
+	err = tempFile.Close()
+	if err != nil {
+		os.Remove(tempName)
+		return fmt.Errorf("cannot close temp file for %s: %v", filename, err)
+	}
+
 	if updated {
-		// Create temporary file in the same directory
-		dir := getDir(filename)
-		tempFile, err := os.CreateTemp(dir, ".greplace_temp_*")
-		if err != nil {
-			return fmt.Errorf("cannot create temp file for %s: %v", filename, err)
-		}
-		tempName := tempFile.Name()
-
-		// Write new content
-		_, err = tempFile.WriteString(result)
-		if err != nil {
-			tempFile.Close()
-			os.Remove(tempName)
-			return fmt.Errorf("cannot write temp file for %s: %v", filename, err)
-		}
-
-		// Close temp file
-		err = tempFile.Close()
-		if err != nil {
-			os.Remove(tempName)
-			return fmt.Errorf("cannot close temp file for %s: %v", filename, err)
-		}
-
-		// Get original file info for permissions
-		info, err := os.Stat(filename)
-		if err != nil {
-			os.Remove(tempName)
-			return fmt.Errorf("cannot stat %s: %v", filename, err)
-		}
-
 		// Set same permissions on temp file
 		err = os.Chmod(tempName, info.Mode())
 		if err != nil {
@@ -205,6 +198,9 @@ func processFile(replacer *CompleteReplacer, filename string, silent, verbose bo
 			fmt.Printf("%s converted\n", filename)
 		}
 	} else {
+		// No changes made, remove temp file
+		os.Remove(tempName)
+
 		if verbose && !silent {
 			fmt.Printf("%s left unchanged\n", filename)
 		}
