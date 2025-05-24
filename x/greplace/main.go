@@ -23,7 +23,7 @@ const (
 	SetMallocHunc = 64
 )
 
-// Placeholder for C's MYF flags (Moved to top level)
+// Placeholder for C's MYF flags (Moved to top level to ensure definition before use)
 const (
 	MYF_ME_BELL     = 1 << 0
 	MYF_MY_WME      = 1 << 1
@@ -805,56 +805,19 @@ func fillBufferRetaining(reader io.Reader, n int) int {
 // It modifies `out` (which points to `outBuff`) and adjusts `max_length` (`outLength`).
 // Returns the actual length of the data written to `outBuff`, or -1 on error. (Using math.MaxUint32 for -1)
 func replaceStrings(rep *Replace, out *[]byte, maxLength *uint, from []byte) uint {
-	// C: `rep_pos=rep+1;` -> This meant starting from the *second* element in the `replace` array, which is `replace[1]`.
-	// The C code uses `rep` as the base pointer to the array of `REPLACE` structs.
-	// If `rep` is `&replaces[0]`, then `rep+1` is `&replaces[1]`.
-	// C `rep_pos` is a `REPLACE *`.
-	// Go needs to keep track of the *current* state, which can be `*Replace` or `*ReplaceString`.
-	// The `Next` array holds `interface{}` precisely for this.
-	// So, `repPos` should be `interface{}` initially to allow subsequent type assertions.
-
-	var repPos interface{} // Will hold *Replace or *ReplaceString
-	// The C code starts at `rep+1`, which in Go's `replaces` array (from `initReplace`) would be `&replaces[1]`.
-	// However, the problem states `rep` (which is `&replaces[0]`) is passed.
-	// The C `rep+1` means the second state in the sequence. `rep->next[0]` is not usually the `rep[1]`
-	// unless that's how the DFA is constructed.
-	// Looking at `init_replace`, `replaces[i].next[j]=replace+sets.set[i].next[j];`
-	// `replace` is `&replaces[0]`. `sets.set[0]` is the *actual* start state.
-	// The C code `rep_pos=rep+1` could be simplified in Go to `repPos = rep.Next[0]`
-	// assuming `rep.Next[0]` is configured as the initial actual state, as constructed by `initReplace`.
-	// The `initReplace` function returns `&replaces[0]`.
-	// Let's assume `rep` itself is `&replaces[0]`. So `rep_pos=rep` or `rep_pos=rep.Next[0]`?
-	// C `rep_pos=rep` is for the initial state. `rep_pos=rep+1` seems odd for the *start* of replacement loop.
-	// Let's re-read the original C code for `replace_strings`: `rep_pos=rep+1;`. This implies that `rep` is the base, and `rep[1]` is the initial *active* state.
-	// This would mean the `Replace` array in `initReplace` would be indexed `0..N`, where `0` is a dummy.
-	// Let's check `init_replace` again: `(void) make_new_set(&sets); make_sets_invisible(&sets);` (this makes sets[0] invisible).
-	// Then `word_states=make_new_set(&sets); start_states=make_new_set(&sets);`.
-	// So `sets.set[0]` is the invisible one, `sets.set[1]` is `word_states`, `sets.set[2]` is `start_states`.
-	// And `replace[i].next[j] = replace+sets.set[i].next[j]` for valid states.
-	// This confirms `replace` acts as the base address of the `replaces` array.
-	// So `rep_pos=rep+1` in C means `replaces[1]` (the second element in the `replaces` array).
-	// But `replaces` is based on `rss.Count` total states. `sets.set[0]` is state 0.
-	// The DFA states are `0` through `rss.Count-1`.
-	// The loop `for (i=0 ; i < sets.count ; i++)` populates `replace[i]`.
-	// This implies `rep_pos=rep` for the start state (state 0).
-	// C `rep_pos=rep+1;` is strange then. Maybe it means the `replace` struct passed *is* the start state already.
-	// `initReplace` returns `&replaces[0]`. So `rep` in `replaceStrings` is `&replaces[0]`.
-	// If `rep_pos=rep+1`, it would be `&replaces[1]`.
-	// This points to a potential mismatch or a very specific design choice.
-	// Let's assume `rep` is the starting state (index 0) of the DFA.
-	// `repPos` should start at `rep` itself, which is `&replaces[0]`.
-
-	repPos = rep // Corrected: Start at the base pointer provided, which is `&replaces[0]` from initReplace.
+	// CORRECTED: repPos must be an interface{} to allow type assertions to both *Replace and *ReplaceString.
+	var repPos interface{}
+	repPos = rep // Initialize with the starting Replace state (which is &replaces[0])
 
 	currentOutPtr := uint(0)               // Logical length of content in `*out`
 	outBufferEndIdx := int(*maxLength) - 1 // Index of last valid byte in `*out`
 
 	for fromPtr := 0; ; { // `fromPtr` is the current read position in `from`
-		// Inner loop: Advance DFA state until a match is found (`rep_pos->found` is true)
+		// Inner loop: Advance DFA state until a match is found (`rep_pos.Found` is true)
 		for {
 			// Type assert repPos to *Replace to access its 'Found' field and 'Next' array
 			currentReplaceState, ok := repPos.(*Replace)
-			if !ok || currentReplaceState.Found { // If it's not *Replace or if Found is true, break inner loop
+			if !ok || currentReplaceState.Found { // If it's not *Replace (i.e., it's *ReplaceString) or if Found is true, break inner loop
 				break
 			}
 
@@ -888,7 +851,6 @@ func replaceStrings(rep *Replace, out *[]byte, maxLength *uint, from []byte) uin
 				// and is still asking for more input (i.e., `repPos.Found` is still false after processing `0`),
 				// it implies the current line doesn't lead to a match and we are at its end.
 				// This is the signal to exit the entire `replaceStrings` loop for this line.
-				// The C code implies this when `*from++` becomes `0` and no match.
 				return currentOutPtr // No match found for the rest of the line, return current output length.
 			}
 		}
@@ -900,10 +862,7 @@ func replaceStrings(rep *Replace, out *[]byte, maxLength *uint, from []byte) uin
 		repString, isReplaceString := repPos.(*ReplaceString)
 
 		// C: `if (!(rep_str = ((REPLACE_STRING*) rep_pos))->replace_string)`
-		if !isReplaceString || repString.ReplaceString == "" { // Check if it's the sentinel `ReplaceString`
-			// This means no replacement string was associated with this final state,
-			// or it's the `replaceStrings[0]` sentinel from `initReplace` indicating end of processing
-			// without a *specific* replacement.
+		if !isReplaceString || repString.ReplaceString == "" { // Check if it's the sentinel `ReplaceString` (empty string)
 			return currentOutPtr // This is the length of processed part of the output buffer.
 		}
 
