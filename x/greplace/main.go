@@ -1,9 +1,12 @@
 package main
 
 import (
-	"fmt" // For io.ReadFull, io.EOF
+	"fmt"
+	"io" // For io.ReadFull, io.EOF
 	"log"
 	"math" // For math.MaxUint32
+	"os"
+	"strings"
 	// For checking space characters
 )
 
@@ -412,7 +415,7 @@ func initReplace(from []string, to []string, count uint, wordEndChars string) ([
 	for i := uint(0); i < count; i++ {
 		currentLen = replaceLen(from[i])
 		if currentLen == 0 {
-			log.Println("No from-string with length 0")
+			myMessage(0, "No from-string with length 0")
 			return nil, nil, fmt.Errorf("empty from-string at index %d", i)
 		}
 		states += currentLen + 1
@@ -772,4 +775,334 @@ func resetBuffer() {
 func freeBuffer() {
 	buffer = nil
 	outBuff = nil
+}
+
+// fillBufferRetaining translates C's `fill_buffer_retaining`.
+// Fills the buffer from the reader, retaining the last `n` bytes at the beginning.
+// Returns the number of new bytes read, or -1 on error.
+func fillBufferRetaining(reader io.Reader, n int) int {
+	// See if we need to grow the buffer.
+	if int(bufAlloc)-n <= bufRead {
+		for int(bufAlloc)-n <= bufRead {
+			bufAlloc *= 2
+			bufRead *= 2
+		}
+		newBuffer := make([]byte, bufAlloc+1)
+		copy(newBuffer, buffer[:bufBytes])
+		buffer = newBuffer
+		if buffer == nil {
+			return -1
+		}
+	}
+
+	// Shift stuff down.
+	if n > 0 && bufBytes >= n {
+		copy(buffer[0:n], buffer[bufBytes-n:bufBytes])
+	}
+	bufBytes = n
+
+	if myEOF != 0 {
+		return 0
+	}
+
+	// Read in new stuff.
+	nRead, err := reader.Read(buffer[bufBytes : bufBytes+bufRead])
+	if err != nil && err != io.EOF {
+		log.Printf("Error reading from input: %v", err)
+		return -1
+	}
+
+	// Kludge to pretend every nonempty file ends with a newline.
+	if nRead == 0 && bufBytes > 0 && buffer[bufBytes-1] != '\n' {
+		myEOF = 1
+		buffer[bufBytes] = '\n'
+		nRead = 1
+	} else if err == io.EOF {
+		myEOF = 1
+	}
+
+	bufBytes += nRead
+	return nRead
+}
+
+// replaceStrings performs string replacements using the DFA.
+func replaceStrings(allReplaces []Replace, allReplaceStrings []ReplaceString, out *[]byte, maxLength *uint, from []byte) uint {
+	log.Printf("replaceStrings: Processing line (len %d): '%s'", len(from), string(from))
+
+	var repPos interface{}
+	if len(allReplaces) > 1 {
+		repPos = &allReplaces[1] // Start at the state corresponding to start_states
+	} else {
+		log.Printf("replaceStrings: Warning: Not enough replace states (%d) for rep+1. Starting from allReplaces[0].", len(allReplaces))
+		repPos = &allReplaces[0]
+	}
+
+	currentOutPtr := uint(0)
+	outBufferEndIdx := int(*maxLength) - 1
+
+	for fromPtr := 0; ; {
+		log.Printf("replaceStrings: Loop start: fromPtr=%d, currentOutPtr=%d, repPosType=%T", fromPtr, currentOutPtr, repPos)
+
+		// Inner loop: Advance DFA state until a match is found
+		for {
+			currentReplaceState, ok := repPos.(*Replace)
+			if !ok {
+				log.Printf("replaceStrings: Match found! repPos is *ReplaceString. Breaking inner loop.")
+				break
+			}
+			if currentReplaceState.Found {
+				log.Printf("replaceStrings: Unexpected: *Replace state has Found=true. Breaking.")
+				break
+			}
+
+			var charToProcess byte
+			if fromPtr < len(from) {
+				charToProcess = from[fromPtr]
+				log.Printf("replaceStrings: Processing char '%c' (byte %d) at fromPtr=%d", charToProcess, charToProcess, fromPtr)
+			} else {
+				charToProcess = 0
+				log.Printf("replaceStrings: End of line, processing null char (byte %d) at fromPtr=%d", charToProcess, fromPtr)
+			}
+
+			nextState := currentReplaceState.Next[charToProcess]
+			log.Printf("replaceStrings: Transitioning from %T to %T for char %d", repPos, nextState, charToProcess)
+			repPos = nextState
+
+			if int(currentOutPtr) >= outBufferEndIdx {
+				*maxLength *= 2
+				newOut := make([]byte, *maxLength)
+				copy(newOut, (*out)[:currentOutPtr])
+				*out = newOut
+				outBufferEndIdx = int(*maxLength) - 1
+				log.Printf("replaceStrings: Output buffer reallocated to %d bytes.", *maxLength)
+			}
+
+			if fromPtr < len(from) {
+				(*out)[currentOutPtr] = charToProcess
+				currentOutPtr++
+				fromPtr++
+				log.Printf("replaceStrings: Copied char. currentOutPtr=%d, fromPtr=%d", currentOutPtr, fromPtr)
+			} else {
+				log.Printf("replaceStrings: End of input line reached without match. Returning current output length %d.", currentOutPtr)
+				return currentOutPtr
+			}
+		}
+
+		repString, isReplaceString := repPos.(*ReplaceString)
+		if !isReplaceString {
+			log.Printf("replaceStrings: Critical Error: repPos is not *ReplaceString after breaking inner loop. Type: %T", repPos)
+			return math.MaxUint32
+		}
+
+		if repString.ReplaceString == "" {
+			log.Printf("replaceStrings: Sentinel ReplaceString encountered (empty replace_string). Returning current output length %d.", currentOutPtr)
+			return currentOutPtr
+		}
+
+		updated = 1
+		log.Printf("replaceStrings: Replacement detected! Original fromPtr: %d, currentOutPtr: %d", fromPtr, currentOutPtr)
+		log.Printf("replaceStrings: ReplaceString: '%s', ToOffset: %d, FromOffset: %d", repString.ReplaceString, repString.ToOffset, repString.FromOffset)
+
+		currentOutPtr -= repString.ToOffset
+		log.Printf("replaceStrings: Adjusted currentOutPtr back by %d to %d", repString.ToOffset, currentOutPtr)
+
+		for _, charRune := range repString.ReplaceString {
+			char := byte(charRune)
+			if int(currentOutPtr) >= outBufferEndIdx {
+				*maxLength *= 2
+				newOut := make([]byte, *maxLength)
+				copy(newOut, (*out)[:currentOutPtr])
+				*out = newOut
+				outBufferEndIdx = int(*maxLength) - 1
+				log.Printf("replaceStrings: Output buffer reallocated during replacement to %d bytes.", *maxLength)
+			}
+			(*out)[currentOutPtr] = char
+			currentOutPtr++
+		}
+		log.Printf("replaceStrings: Copied replacement string. New currentOutPtr=%d", currentOutPtr)
+
+		fromPtr -= repString.FromOffset
+		if fromPtr < 0 {
+			fromPtr = 0
+		}
+		log.Printf("replaceStrings: Adjusted fromPtr back by %d to %d", repString.FromOffset, fromPtr)
+
+		if fromPtr >= len(from) && repString.Found != 2 {
+			log.Printf("replaceStrings: End of input reached after replacement. Returning current output length %d.", currentOutPtr)
+			return currentOutPtr
+		}
+
+		repPos = &allReplaces[0]
+		log.Printf("replaceStrings: Resetting repPos to initial state for next scan.")
+	}
+}
+
+// convertPipe translates C's `convert_pipe`.
+// Processes input from a reader (stdin) to a writer (stdout).
+func convertPipe(replaces []Replace, replaceStringStructs []ReplaceString, in io.Reader, out io.Writer) int {
+	log.Printf("convertPipe: Starting pipe conversion.")
+	updated = 0
+	retain := 0
+	resetBuffer()
+
+	for {
+		log.Printf("convertPipe: Calling fillBufferRetaining with retain=%d", retain)
+		bytesRead := fillBufferRetaining(in, retain)
+		log.Printf("convertPipe: fillBufferRetaining returned %d bytes. bufBytes=%d, myEOF=%d", bytesRead, bufBytes, myEOF)
+
+		if bytesRead < 0 {
+			log.Printf("convertPipe: Error from fillBufferRetaining, returning 1.")
+			return 1
+		}
+		if bytesRead == 0 && myEOF != 0 && bufBytes == 0 {
+			log.Printf("convertPipe: End of file and empty buffer. Breaking loop.")
+			break
+		}
+		if bufBytes == 0 && bytesRead == 0 && myEOF == 0 {
+			log.Printf("convertPipe: No data read, not EOF. Could be stalled or empty input. Breaking.")
+			break
+		}
+
+		if bufBytes < len(buffer) {
+			buffer[bufBytes] = 0
+			log.Printf("convertPipe: Added null sentinel at buffer[%d]", bufBytes)
+		}
+
+		endOfLinePtr := 0
+		for {
+			startOfLinePtr := endOfLinePtr
+			log.Printf("convertPipe: Scanning for end of line from index %d (bufBytes=%d)", endOfLinePtr, bufBytes)
+			for endOfLinePtr < bufBytes && buffer[endOfLinePtr] != '\n' && buffer[endOfLinePtr] != 0 {
+				endOfLinePtr++
+			}
+			log.Printf("convertPipe: End of line found at index %d", endOfLinePtr)
+
+			if endOfLinePtr == bufBytes {
+				retain = bufBytes - startOfLinePtr
+				log.Printf("convertPipe: End of buffered data. Retaining %d bytes. Breaking inner loop.", retain)
+				break
+			}
+
+			saveChar := buffer[endOfLinePtr]
+			log.Printf("convertPipe: Saved char '%c' (byte %d) at endOfLinePtr=%d", saveChar, saveChar, endOfLinePtr)
+			endOfLinePtr++
+
+			lineContent := buffer[startOfLinePtr : endOfLinePtr-1]
+			log.Printf("convertPipe: Calling replaceStrings for line: '%s'", string(lineContent))
+			length := replaceStrings(replaces, replaceStringStructs, &outBuff, &outLength, lineContent)
+			log.Printf("convertPipe: replaceStrings returned length %d", length)
+
+			if length == math.MaxUint32 {
+				log.Printf("convertPipe: Error from replaceStrings, returning 1.")
+				return 1
+			}
+
+			if myEOF == 0 || (myEOF == 1 && saveChar == '\n') {
+				if uint(len(outBuff)) <= length {
+					*&outLength *= 2
+					newOutBuff := make([]byte, *&outLength)
+					copy(newOutBuff, outBuff[:length])
+					outBuff = newOutBuff
+					log.Printf("convertPipe: Output buffer reallocated for newline to %d bytes.", *&outLength)
+				}
+				outBuff[length] = saveChar
+				length++
+				log.Printf("convertPipe: Appended saved char. New length=%d", length)
+			}
+
+			log.Printf("convertPipe: Writing %d bytes to output: '%s'", length, string(outBuff[:length]))
+			_, err := out.Write(outBuff[:length])
+			if err != nil {
+				log.Printf("Error writing to output: %v", err)
+				return 1
+			}
+		}
+	}
+	log.Printf("convertPipe: Pipe conversion finished successfully.")
+	return 0
+}
+
+// myMessage is a placeholder for C's my_message function.
+func myMessage(flags int, msg string, args ...interface{}) {
+	if strings.ContainsRune(msg, '%') {
+		fmt.Fprintf(os.Stderr, "Error: %s\n", fmt.Sprintf(msg, args...))
+	} else if len(args) > 0 {
+		fmt.Fprintf(os.Stderr, "Error: %s (flags: %v)\n", msg, flags)
+	} else {
+		fmt.Fprintf(os.Stderr, "Error: %s\n", msg)
+	}
+}
+
+// myIsspace dummy for space character checking
+func myIsspace(charset interface{}, r rune) bool {
+	return r == ' ' || r == '\t' || r == '\n' ||
+		r == '\r' || r == '\v' || r == '\f'
+}
+
+func main() {
+	// Simple argument parsing: pairs of from/to strings
+	args := os.Args[1:]
+
+	if len(args) == 0 {
+		fmt.Fprintf(os.Stderr, "Usage: %s from1 to1 [from2 to2 ...]\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Reads from stdin and writes to stdout\n")
+		os.Exit(1)
+	}
+
+	if len(args)%2 != 0 {
+		fmt.Fprintf(os.Stderr, "Error: Arguments must be pairs of from/to strings\n")
+		os.Exit(1)
+	}
+
+	// Build from and to arrays
+	var fromArray, toArray PointerArray
+	for i := 0; i < len(args); i += 2 {
+		if err := fromArray.insertPointerName(args[i]); err != nil {
+			fmt.Fprintf(os.Stderr, "Error adding from string: %v\n", err)
+			os.Exit(1)
+		}
+		if err := toArray.insertPointerName(args[i+1]); err != nil {
+			fmt.Fprintf(os.Stderr, "Error adding to string: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
+	// Build word end characters (spaces)
+	wordEndChars := make([]byte, 0, 256)
+	for i := 1; i < 256; i++ {
+		if myIsspace(nil, rune(i)) {
+			wordEndChars = append(wordEndChars, byte(i))
+		}
+	}
+
+	// Initialize the replacement DFA
+	replaces, replaceStringStructs, err := initReplace(
+		fromArray.Typelib.TypeNames,
+		toArray.Typelib.TypeNames,
+		fromArray.Typelib.Count,
+		string(wordEndChars))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to initialize replacement: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Clean up arrays
+	fromArray.freePointerArray()
+	toArray.freePointerArray()
+
+	// Initialize buffers
+	if err := initializeBuffer(); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to initialize buffer: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Process stdin to stdout
+	errorVal := convertPipe(replaces, replaceStringStructs, os.Stdin, os.Stdout)
+
+	// Clean up
+	freeBuffer()
+
+	if errorVal != 0 {
+		os.Exit(2)
+	}
 }
