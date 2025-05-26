@@ -405,6 +405,7 @@ func findSet(rss *RepSets, find *RepSet) int16 {
 }
 
 func initReplace(from []string, to []string, count uint, wordEndChars string) (*Replace, error) {
+	log.Printf("initReplace: Initializing DFA for %d replacement pairs", count)
 	var (
 		states     uint = 2
 		resultLen  uint = 0
@@ -422,7 +423,9 @@ func initReplace(from []string, to []string, count uint, wordEndChars string) (*
 		if currentLen > maxLength {
 			maxLength = currentLen
 		}
+		log.Printf("initReplace: Pair %d: from='%s' (len=%d), to='%s'", i, from[i], currentLen, to[i])
 	}
+	log.Printf("initReplace: Total states estimated: %d, Max from-string length: %d", states, maxLength)
 
 	isWordEnd := [256]bool{}
 	for _, char := range wordEndChars {
@@ -520,6 +523,7 @@ func initReplace(from []string, to []string, count uint, wordEndChars string) (*
 
 	for setNr := uint(0); setNr < rss.Count; setNr++ {
 		currentSet := &rss.Set[setNr]
+		log.Printf("initReplace: Processing set %d (Count: %d)", setNr, rss.Count)
 
 		defaultState := int16(0)
 
@@ -531,6 +535,7 @@ func initReplace(from []string, to []string, count uint, wordEndChars string) (*
 			if follows[i].Chr == 0 {
 				if defaultState == 0 {
 					defaultState = findFound(foundSet, currentSet.TableOffset, currentSet.FoundOffset+1)
+					log.Printf("initReplace: Set %d: Default state set to %d (foundSet index: %d)", setNr, defaultState, -defaultState-2)
 				}
 			}
 		}
@@ -554,6 +559,7 @@ func initReplace(from []string, to []string, count uint, wordEndChars string) (*
 				usedChars[0] = true
 			}
 		}
+		// log.Printf("initReplace: Set %d: Used chars: %v", setNr, usedChars)
 
 		if usedChars[SpaceChar] {
 			for charCode := 0; charCode < 256; charCode++ {
@@ -573,7 +579,7 @@ func initReplace(from []string, to []string, count uint, wordEndChars string) (*
 					return nil, fmt.Errorf("failed to make new set for character %d", chr)
 				}
 
-				currentSet = &rss.Set[setNr]
+				currentSet = &rss.Set[setNr] // Re-get currentSet as makeNewSet might reallocate underlying array
 
 				newSet.TableOffset = currentSet.TableOffset
 				newSet.FoundLen = currentSet.FoundLen
@@ -653,11 +659,14 @@ func initReplace(from []string, to []string, count uint, wordEndChars string) (*
 							newSet.TableOffset,
 							newSet.FoundOffset)
 						rss.freeLastSet()
+						log.Printf("initReplace: Set %d, Char %d: Found match, next state is %d (foundSet index: %d)", setNr, chr, currentSet.Next[chr], -currentSet.Next[chr]-2)
 					} else {
 						currentSet.Next[chr] = findSet(&rss, newSet)
+						log.Printf("initReplace: Set %d, Char %d: Next state is %d (new set)", setNr, chr, currentSet.Next[chr])
 					}
 				} else {
 					currentSet.Next[chr] = findSet(&rss, newSet)
+					log.Printf("initReplace: Set %d, Char %d: Next state is %d (existing set)", setNr, chr, currentSet.Next[chr])
 				}
 			}
 		}
@@ -684,6 +693,8 @@ func initReplace(from []string, to []string, count uint, wordEndChars string) (*
 		replaceStrings[i].ReplaceString = to[foundSet[i-1].TableOffset]
 		replaceStrings[i].ToOffset = uint(foundSet[i-1].FoundOffset - int(startAtWord(fromStr)))
 		replaceStrings[i].FromOffset = foundSet[i-1].FoundOffset - int(replaceLen(fromStr)) + int(endOfWord(fromStr))
+		log.Printf("initReplace: ReplaceString %d: from='%s', to='%s', toOffset=%d, fromOffset=%d",
+			i, fromStr, replaceStrings[i].ReplaceString, replaceStrings[i].ToOffset, replaceStrings[i].FromOffset)
 	}
 
 	for i := uint(0); i < totalReplaceStates; i++ {
@@ -701,7 +712,7 @@ func initReplace(from []string, to []string, count uint, wordEndChars string) (*
 		}
 	}
 
-	log.Printf("Replace table has %d states", rss.Count)
+	log.Printf("Replace table has %d states, %d replace strings", rss.Count, foundSets)
 	return &replaces[0], nil
 }
 
@@ -811,7 +822,7 @@ func fillBufferRetaining(reader io.Reader, n int) int {
 // Returns the actual length of the data written to `outBuff`, or -1 on error.
 // (Using math.MaxUint32 for -1)
 func replaceStrings(rep *Replace, out *[]byte, maxLength *uint, from []byte) uint {
-	// CORRECTED: repPos must be an interface{} to allow type assertions to both *Replace and *ReplaceString.
+	log.Printf("replaceStrings: Processing line (len %d): '%s'", len(from), string(from))
 	var repPos interface{}
 	repPos = rep // Initialize with the starting Replace state (which is &replaces[0])
 
@@ -819,11 +830,19 @@ func replaceStrings(rep *Replace, out *[]byte, maxLength *uint, from []byte) uin
 	outBufferEndIdx := int(*maxLength) - 1 // Index of last valid byte in `*out`
 
 	for fromPtr := 0; ; { // `fromPtr` is the current read position in `from`
+		log.Printf("replaceStrings: Loop start: fromPtr=%d, currentOutPtr=%d, repPosType=%T", fromPtr, currentOutPtr, repPos)
+
 		// Inner loop: Advance DFA state until a match is found (`rep_pos.Found` is true)
 		for {
 			// Type assert repPos to *Replace to access its 'Found' field and 'Next' array
 			currentReplaceState, ok := repPos.(*Replace)
-			if !ok || currentReplaceState.Found { // If it's not *Replace (i.e., it's *ReplaceString) or if Found is true, break inner loop
+			if !ok {
+				// If it's not *Replace, it must be *ReplaceString (a match)
+				log.Printf("replaceStrings: Match found! repPos is *ReplaceString. Breaking inner loop.")
+				break
+			}
+			if currentReplaceState.Found { // If Found is true for a *Replace (shouldn't happen with correct DFA)
+				log.Printf("replaceStrings: Unexpected: *Replace state has Found=true. This indicates a DFA construction issue or logic error. Breaking.")
 				break
 			}
 
@@ -831,12 +850,16 @@ func replaceStrings(rep *Replace, out *[]byte, maxLength *uint, from []byte) uin
 			var charToProcess byte
 			if fromPtr < len(from) {
 				charToProcess = from[fromPtr]
+				log.Printf("replaceStrings: Processing char '%c' (byte %d) at fromPtr=%d", charToProcess, charToProcess, fromPtr)
 			} else {
 				charToProcess = 0 // End of input line, use null char for DFA
+				log.Printf("replaceStrings: End of line, processing null char (byte %d) at fromPtr=%d", charToProcess, fromPtr)
 			}
 
 			// Advance DFA state: `rep_pos = rep_pos->next[(uchar) *from];`
-			repPos = currentReplaceState.Next[charToProcess]
+			nextState := currentReplaceState.Next[charToProcess]
+			log.Printf("replaceStrings: Transitioning from %T to %T for char %d", repPos, nextState, charToProcess)
+			repPos = nextState
 
 			// If current position in output buffer exceeds its capacity, reallocate.
 			if int(currentOutPtr) >= outBufferEndIdx {
@@ -845,18 +868,21 @@ func replaceStrings(rep *Replace, out *[]byte, maxLength *uint, from []byte) uin
 				copy(newOut, (*out)[:currentOutPtr]) // Copy already processed output
 				*out = newOut
 				outBufferEndIdx = int(*maxLength) - 1
+				log.Printf("replaceStrings: Output buffer reallocated to %d bytes.", *maxLength)
 			}
 
 			// Copy character from input to output unless it's a null sentinel marking end of line
 			if fromPtr < len(from) {
-				(*out)[currentOutPtr] = from[fromPtr]
+				(*out)[currentOutPtr] = charToProcess
 				currentOutPtr++
 				fromPtr++
+				log.Printf("replaceStrings: Copied char. currentOutPtr=%d, fromPtr=%d", currentOutPtr, fromPtr)
 			} else {
 				// If we've processed all input characters from `from`, but the DFA hasn't found a match
 				// and is still asking for more input (i.e., `repPos.Found` is still false after processing `0`),
 				// it implies the current line doesn't lead to a match and we are at its end.
 				// This is the signal to exit the entire `replaceStrings` loop for this line.
+				log.Printf("replaceStrings: End of input line reached without match. Returning current output length %d.", currentOutPtr)
 				return currentOutPtr // No match found for the rest of the line, return current output length.
 			}
 		}
@@ -864,17 +890,22 @@ func replaceStrings(rep *Replace, out *[]byte, maxLength *uint, from []byte) uin
 		// A match or end of line reached. `repPos` is either a `*ReplaceString` (found match)
 		// or, if `repPos.Found` became true for a `*Replace` struct, it's an error.
 		// The DFA construction should ensure `Found == true` only for `*ReplaceString` or `rep` (base).
+
 		repString, isReplaceString := repPos.(*ReplaceString)
 
 		// C: `if (!(rep_str = ((REPLACE_STRING*) rep_pos))->replace_string)`
 		if !isReplaceString || repString.ReplaceString == "" { // Check if it's the sentinel `ReplaceString` (empty string)
+			log.Printf("replaceStrings: Sentinel ReplaceString encountered (empty replace_string). Returning current output length %d.", currentOutPtr)
 			return currentOutPtr // This is the length of processed part of the output buffer.
 		}
 
 		updated = 1 // Some char is replaced (C's updated=1)
+		log.Printf("replaceStrings: Replacement detected! Original fromPtr: %d, currentOutPtr: %d", fromPtr, currentOutPtr)
+		log.Printf("replaceStrings: ReplaceString: '%s', ToOffset: %d, FromOffset: %d", repString.ReplaceString, repString.ToOffset, repString.FromOffset)
 
 		// C: `to-=rep_str->to_offset;`
 		currentOutPtr -= repString.ToOffset // Adjust output pointer backward
+		log.Printf("replaceStrings: Adjusted currentOutPtr back by %d to %d", repString.ToOffset, currentOutPtr)
 
 		// Copy replacement string to output
 		// C: `for (pos=rep_str->replace_string; *pos ; pos++)`
@@ -887,10 +918,12 @@ func replaceStrings(rep *Replace, out *[]byte, maxLength *uint, from []byte) uin
 				copy(newOut, (*out)[:currentOutPtr])
 				*out = newOut
 				outBufferEndIdx = int(*maxLength) - 1
+				log.Printf("replaceStrings: Output buffer reallocated during replacement to %d bytes.", *maxLength)
 			}
 			(*out)[currentOutPtr] = char // Copy character
 			currentOutPtr++
 		}
+		log.Printf("replaceStrings: Copied replacement string. New currentOutPtr=%d", currentOutPtr)
 
 		// Adjust input pointer for the next scan.
 		// C: `if (!*(from-=rep_str->from_offset) && rep_pos->found != 2)`
@@ -898,17 +931,20 @@ func replaceStrings(rep *Replace, out *[]byte, maxLength *uint, from []byte) uin
 		if fromPtr < 0 {                // Ensure fromPtr doesn't go negative
 			fromPtr = 0
 		}
+		log.Printf("replaceStrings: Adjusted fromPtr back by %d to %d", repString.FromOffset, fromPtr)
 
 		// C's `!*(from-=rep_str->from_offset)` means the character at `from` (after adjustment) is null (end of line).
 		// If `fromPtr` reaches the end of the input `from` slice (current line content) AND
 		// the `repString.Found` flag is not 2 (which indicates `\^` only match that needs continuation).
 		if fromPtr >= len(from) && repString.Found != 2 {
+			log.Printf("replaceStrings: End of input reached after replacement. Returning current output length %d.", currentOutPtr)
 			return currentOutPtr // Return actual length of processed output.
 		}
 
 		// Reset DFA state for next scan
 		// C: `rep_pos=rep;` (rep is the base address of the DFA states, points to rep[0])
 		repPos = rep // Reset to the initial state (which is &replaces[0])
+		log.Printf("replaceStrings: Resetting repPos to initial state for next scan.")
 	}
 }
 
@@ -917,24 +953,26 @@ func replaceStrings(rep *Replace, out *[]byte, maxLength *uint, from []byte) uin
 // convertPipe translates C's `convert_pipe`.
 // Processes input from a reader (stdin) to a writer (stdout).
 func convertPipe(rep *Replace, in io.Reader, out io.Writer) int {
-	// DBUG_ENTER("convert_pipe");
-	// Go equivalent: log debug
-
+	log.Printf("convertPipe: Starting pipe conversion.")
 	updated = 0 // Reset global updated flag
 	retain := 0
 	resetBuffer() // Reset global buffer state
 
 	for {
-		// C: `while ((error=fill_buffer_retaining(my_fileno(in),retain)) > 0)`
-		// In Go, fillBufferRetaining returns bytes read or -1 for error.
+		log.Printf("convertPipe: Calling fillBufferRetaining with retain=%d", retain)
 		bytesRead := fillBufferRetaining(in, retain)
+		log.Printf("convertPipe: fillBufferRetaining returned %d bytes. bufBytes=%d, myEOF=%d", bytesRead, bufBytes, myEOF)
+
 		if bytesRead < 0 { // Error
+			log.Printf("convertPipe: Error from fillBufferRetaining, returning 1.")
 			return 1
 		}
 		if bytesRead == 0 && myEOF != 0 && bufBytes == 0 { // No more data and actual EOF, and buffer is empty
+			log.Printf("convertPipe: End of file and empty buffer. Breaking loop.")
 			break // Exit loop
 		}
 		if bufBytes == 0 && bytesRead == 0 && myEOF == 0 { // No data read, not EOF yet (can happen with empty input)
+			log.Printf("convertPipe: No data read, not EOF. Could be stalled or empty input. Breaking.")
 			break // Could be stalled, exit.
 		}
 
@@ -946,6 +984,7 @@ func convertPipe(rep *Replace, in io.Reader, out io.Writer) int {
 		// `bufAlloc+1` should cover it.
 		if bufBytes < len(buffer) {
 			buffer[bufBytes] = 0
+			log.Printf("convertPipe: Added null sentinel at buffer[%d]", bufBytes)
 		}
 
 		endOfLinePtr := 0 // Index into `buffer` for current line processing
@@ -953,20 +992,24 @@ func convertPipe(rep *Replace, in io.Reader, out io.Writer) int {
 			startOfLinePtr := endOfLinePtr
 			// Find end of line (newline or null terminator from sentinel)
 			// C: `while (end_of_line[0] != '\n' && end_of_line[0])`
+			log.Printf("convertPipe: Scanning for end of line from index %d (bufBytes=%d)", endOfLinePtr, bufBytes)
 			for endOfLinePtr < bufBytes && buffer[endOfLinePtr] != '\n' && buffer[endOfLinePtr] != 0 {
 				endOfLinePtr++
 			}
+			log.Printf("convertPipe: End of line found at index %d", endOfLinePtr)
 
 			if endOfLinePtr == bufBytes { // Reached end of currently buffered data
 				// C: `retain= (int) (end_of_line - start_of_line);
 				// break;`
 				retain = bufBytes - startOfLinePtr // Amount to retain for next read
-				break                              // Break inner loop, go read more data
+				log.Printf("convertPipe: End of buffered data. Retaining %d bytes. Breaking inner loop.", retain)
+				break // Break inner loop, go read more data
 			}
 
 			// C: `save_char=end_of_line[0];
 			// end_of_line[0]=0; end_of_line++;`
 			saveChar := buffer[endOfLinePtr] // Save the newline or null char
+			log.Printf("convertPipe: Saved char '%c' (byte %d) at endOfLinePtr=%d", saveChar, saveChar, endOfLinePtr)
 			// `buffer[endOfLinePtr] = 0` is conceptually done when we pass a subslice
 			// (or handle it as a sentinel for DFA).
 			// The `replaceStrings` function receives the slice up to this point.
@@ -976,8 +1019,12 @@ func convertPipe(rep *Replace, in io.Reader, out io.Writer) int {
 			// The `replaceStrings` function expects `from` as a byte slice.
 			// The `from` slice should be just the content, not including the newline/null.
 			lineContent := buffer[startOfLinePtr : endOfLinePtr-1]
+			log.Printf("convertPipe: Calling replaceStrings for line: '%s'", string(lineContent))
 			length := replaceStrings(rep, &outBuff, &outLength, lineContent)
+			log.Printf("convertPipe: replaceStrings returned length %d", length)
+
 			if length == math.MaxUint32 { // Error indicated by `math.MaxUint32` (-1 in C)
+				log.Printf("convertPipe: Error from replaceStrings, returning 1.")
 				return 1
 			}
 
@@ -990,12 +1037,15 @@ func convertPipe(rep *Replace, in io.Reader, out io.Writer) int {
 					newOutBuff := make([]byte, *&outLength)
 					copy(newOutBuff, outBuff[:length])
 					outBuff = newOutBuff
+					log.Printf("convertPipe: Output buffer reallocated for newline to %d bytes.", *&outLength)
 				}
 				outBuff[length] = saveChar // Add back the original line terminator
 				length++
+				log.Printf("convertPipe: Appended saved char. New length=%d", length)
 			}
 
 			// C: `if (my_fwrite(out, (uchar*) out_buff, length, MYF(MY_WME | MY_NABP)))`
+			log.Printf("convertPipe: Writing %d bytes to output: '%s'", length, string(outBuff[:length]))
 			_, err := out.Write(outBuff[:length])
 			if err != nil {
 				log.Printf("Error writing to output: %v", err)
@@ -1003,14 +1053,14 @@ func convertPipe(rep *Replace, in io.Reader, out io.Writer) int {
 			}
 		}
 	}
+	log.Printf("convertPipe: Pipe conversion finished successfully.")
 	return 0 // Success
 }
 
 // convertFile translates C's `convert_file`.
 // Opens a file, performs replacement, and writes to a temporary file, then renames.
 func convertFile(rep *Replace, name string) int {
-	// DBUG_ENTER("convert_file"); // Go equivalent: log debug
-
+	log.Printf("convertFile: Starting file conversion for '%s'", name)
 	var (
 		in  *os.File
 		out *os.File
@@ -1023,6 +1073,7 @@ func convertFile(rep *Replace, name string) int {
 	if !myDisableSymlinks { // Assuming myDisableSymlinks global is available (mocked to false)
 		if linkedPath, linkErr := os.Readlink(name); linkErr == nil {
 			orgName = linkedPath // Follow symlink
+			log.Printf("convertFile: Symlink detected, using original path '%s'", orgName)
 		}
 	}
 
@@ -1042,10 +1093,12 @@ func convertFile(rep *Replace, name string) int {
 	}
 	tempname := tempFile.Name() // Get the name of the temporary file
 	defer os.Remove(tempname)   // Ensure temp file is cleaned up if rename fails or exits early
+	log.Printf("convertFile: Created temporary file: '%s'", tempname)
 
 	out = tempFile                        // os.CreateTemp returns *os.File, which can be used directly as a writer.
 	errorVal := convertPipe(rep, in, out) // Perform replacement
 	out.Close()                           // Explicitly close output before rename/delete
+	log.Printf("convertFile: convertPipe finished with errorVal=%d", errorVal)
 
 	if updated != 0 && errorVal == 0 { // C: `if (updated && ! error)`
 		// C: `my_redel(org_name,tempname,MYF(MY_WME | MY_LINK_WARNING));`
@@ -1055,9 +1108,11 @@ func convertFile(rep *Replace, name string) int {
 			myMessage(MYF_MY_WME|MY_LINK_WARNING, "Failed to rename temporary file to %s: %v", orgName, err)
 			return 1
 		}
+		log.Printf("convertFile: Renamed '%s' to '%s'", tempname, orgName)
 	} else {
 		// C: `my_delete(tempname,MYF(MY_WME));`
 		os.Remove(tempname) // Delete temporary file if not updated or if there was an error
+		log.Printf("convertFile: Deleted temporary file '%s' (updated=%d, errorVal=%d)", tempname, updated, errorVal)
 	}
 
 	if silent == 0 && errorVal == 0 { // C: `if (!silent && ! error)`
@@ -1067,6 +1122,7 @@ func convertFile(rep *Replace, name string) int {
 			fmt.Printf("%s left unchanged\n", name)
 		}
 	}
+	log.Printf("convertFile: Finished file conversion for '%s'", name)
 	return errorVal // Return 0 for success, 1 for error
 }
 
@@ -1157,12 +1213,10 @@ func main() {
 						log.Println("Debug flag detected, skipping remaining argument for DBUG_PUSH equivalent.")
 						goto nextCliArg // Skip to next command-line argument
 					case 'V': // Version flag
-						// This 'version' variable was causing the undefined error.
 						// The original C code just prints and breaks.
 						fmt.Printf("%s  Ver 1.4 for %s at %s\n", myProgname, "Go", "Unknown") // Placeholder for system info
 						fallthrough                                                           // Fall through to 'I' or '?' for help text
 					case 'I', '?':
-						help = true
 						// The C code prints version info and then help text if -V is given or just help for -I/?
 						if arg[j] == 'I' || arg[j] == '?' { // Only print full help if not already printed by -V
 							fmt.Printf("%s  Ver 1.4 for %s at %s\n", myProgname, "Go", "Unknown") // Placeholder for system info
@@ -1186,7 +1240,7 @@ func main() {
 						fmt.Printf("Usage: %s [-?svIV] from to from to ... < fromfile > tofile\n", myProgname)
 						fmt.Println("")
 						fmt.Println("Options: -? or -I \"Info\"  -s \"silent\"      -v \"verbose\"")
-						break // Break from inner char loop
+						os.Exit(0) // Exit after printing help
 					default:
 						fmt.Fprintf(os.Stderr, "illegal option: -%c\n", arg[j])
 						os.Exit(1)
