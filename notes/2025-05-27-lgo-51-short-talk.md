@@ -89,3 +89,21 @@ $ git diff --stat 0a5555b4 -- harvest.go client.go cmd/metha-sync/main.go
 
 ## replace.c port to Go
 
+* Claude 4, Gemini 2.5 (flash, pro) did not crack it
+* step by step approach
+* Claude 4 and Gemini 2.5 had very different styles; more idiomatic Go, more close to C
+* at the end Claude 4 suggested to through away everything and just use
+  "strings.Replace" - it did not suggest
+[strings.NewReplacer](https://pkg.go.dev/strings#NewReplacer), which should be
+faster
+
+
+## random insights
+
+> Looking at the debug log, I can see the issue clearly.
+
+> Looking at the debug output, the core issue is that the DFA construction is
+> fundamentally broken. Let me provide a much simpler approach that focuses on
+> getting basic string replacement working without the complex DFA
+> construction:
+
