@@ -1084,7 +1084,6 @@ func myMessage(flags int, msg string, args ...interface{}) {
 		// print the message and then the "extra" arguments for debugging/info.
 		fmt.Fprintf(os.Stderr, "Error: %s (flags: %v)\n", msg, flags) // Or just `args` if flags is separate.
 	} else {
-		// Just print the message.
 		fmt.Fprintf(os.Stderr, "Error: %s\n", msg)
 	}
 	// The 'flags' parameter (like MYF_ME_BELL) is currently received but its specific behavior
@@ -1129,96 +1128,107 @@ var myProgname = "replace_strings" // Default, will be set in main
 func main() {
 	myInit(os.Args[0]) // Initialize program name for logging
 
-	// Handle command-line arguments.
-	// In C, static_get_options modifies argc and argv. In Go, we'll process os.Args.
-	// We'll mimic the C option parsing here.
-	args := os.Args[1:] // Skip the program name
-	parsedArgs := []string{}
-	help := false
-	version := false
-	for i := 0; i < len(args); i++ {
-		arg := args[i]
-		if len(arg) > 1 && arg[0] == '-' && arg[1] != '-' {
-			for j := 1; j < len(arg); j++ {
-				switch arg[j] {
-				case 's':
-					silent = 1 // Set silent flag
-				case 'v':
-					verbose = 1 // Set verbose flag
-				case '#':
-					// DBUG_PUSH logic from C; in Go, we might use log.SetOutput for debug
-					// For now, just skip the rest of the current argument.
-					log.Println("Debug flag detected, skipping remaining argument for DBUG_PUSH equivalent.")
-					goto nextArg // Break from inner loop and move to next outer arg
-				case 'V':
-					version = true // Set version flag
-					fallthrough
-				case 'I', '?':
-					help = true                                                           // Set help flag
-					fmt.Printf("%s  Ver 1.4 for %s at %s\n", myProgname, "Go", "Unknown") // Placeholder for system info
-					if version {
-						break
-					}
-					fmt.Println("This software comes with ABSOLUTELY NO WARRANTY. This is free software,\nand you are welcome to modify and redistribute it under the GPL license\n")
-					fmt.Println("This program replaces strings in files or from stdin to stdout.\n" +
-						"It accepts a list of from-string/to-string pairs and replaces\n" +
-						"each occurrence of a from-string with the corresponding to-string.\n" +
-						"The first occurrence of a found string is matched. If there is\n" +
-						"more than one possibility for the string to replace, longer\n" +
-						"matches are preferred before shorter matches.\n\n" +
-						"A from-string can contain these special characters:\n" +
-						"  \\^      Match start of line.\n" +
-						"  \\$      Match end of line.\n" +
-						"  \\b      Match space-character, start of line or end of line.\n" +
-						"          For a end \\b the next replace starts locking at the end\n" +
-						"          space-character. A \\b alone in a string matches only a\n" +
-						"          space-character.\n")
-					fmt.Printf("Usage: %s [-?svIV] from to from to ... -- [files]\n", myProgname)
-					fmt.Println("or")
-					fmt.Printf("Usage: %s [-?svIV] from to from to ... < fromfile > tofile\n", myProgname)
-					fmt.Println("")
-					fmt.Println("Options: -? or -I \"Info\"  -s \"silent\"      -v \"verbose\"")
-					break
-				default:
-					fmt.Fprintf(os.Stderr, "illegal option: -%c\n", arg[j])
-					os.Exit(1)
-				}
+	cliArgs := os.Args[1:] // All arguments after program name
+
+	// Separate arguments into flags, replacement pairs, and explicit filenames.
+	fromToPairs := []string{}
+	finalFileNames := []string{}
+
+	parsingFlagsAndFromTo := true // State flag to distinguish between initial args and args after '--'
+	var help bool
+
+	for i := 0; i < len(cliArgs); i++ {
+		arg := cliArgs[i]
+		if parsingFlagsAndFromTo && len(arg) > 1 && arg[0] == '-' {
+			if arg == "--" {
+				// Found the -- delimiter, switch to parsing explicit filenames
+				parsingFlagsAndFromTo = false
+				continue
 			}
-		} else if arg == "--" { // Stop option parsing after "--"
-			parsedArgs = append(parsedArgs, args[i+1:]...) // Add remaining arguments as file names
-			break
+			// Process short flags (e.g., -s, -v)
+			if arg[1] != '-' { // Not a long flag
+				for j := 1; j < len(arg); j++ {
+					switch arg[j] {
+					case 's':
+						silent = 1
+					case 'v':
+						verbose = 1
+					case '#':
+						log.Println("Debug flag detected, skipping remaining argument for DBUG_PUSH equivalent.")
+						goto nextCliArg // Skip to next command-line argument
+					case 'V': // Version flag
+						// This 'version' variable was causing the undefined error.
+						// The original C code just prints and breaks.
+						fmt.Printf("%s  Ver 1.4 for %s at %s\n", myProgname, "Go", "Unknown") // Placeholder for system info
+						fallthrough                                                           // Fall through to 'I' or '?' for help text
+					case 'I', '?':
+						help = true
+						// The C code prints version info and then help text if -V is given or just help for -I/?
+						if arg[j] == 'I' || arg[j] == '?' { // Only print full help if not already printed by -V
+							fmt.Printf("%s  Ver 1.4 for %s at %s\n", myProgname, "Go", "Unknown") // Placeholder for system info
+						}
+						fmt.Println("This software comes with ABSOLUTELY NO WARRANTY. This is free software,\nand you are welcome to modify and redistribute it under the GPL license\n")
+						fmt.Println("This program replaces strings in files or from stdin to stdout.\n" +
+							"It accepts a list of from-string/to-string pairs and replaces\n" +
+							"each occurrence of a from-string with the corresponding to-string.\n" +
+							"The first occurrence of a found string is matched. If there is\n" +
+							"more than one possibility for the string to replace, longer\n" +
+							"matches are preferred before shorter matches.\n\n" +
+							"A from-string can contain these special characters:\n" +
+							"  \\^      Match start of line.\n" +
+							"  \\$      Match end of line.\n" +
+							"  \\b      Match space-character, start of line or end of line.\n" +
+							"          For a end \\b the next replace starts locking at the end\n" +
+							"          space-character. A \\b alone in a string matches only a\n" +
+							"          space-character.\n")
+						fmt.Printf("Usage: %s [-?svIV] from to from to ... -- [files]\n", myProgname)
+						fmt.Println("or")
+						fmt.Printf("Usage: %s [-?svIV] from to from to ... < fromfile > tofile\n", myProgname)
+						fmt.Println("")
+						fmt.Println("Options: -? or -I \"Info\"  -s \"silent\"      -v \"verbose\"")
+						break // Break from inner char loop
+					default:
+						fmt.Fprintf(os.Stderr, "illegal option: -%c\n", arg[j])
+						os.Exit(1)
+					}
+				}
+				continue // Move to next `cliArgs` element after processing flag
+			}
+		}
+		// If we are in explicit file mode or it's not a flag (and not '--'), add to appropriate list
+		if parsingFlagsAndFromTo {
+			fromToPairs = append(fromToPairs, arg)
 		} else {
-			parsedArgs = append(parsedArgs, arg) // Add non-option argument
+			finalFileNames = append(finalFileNames, arg)
 		}
-	nextArg:
+	nextCliArg:
 	}
 
-	if len(parsedArgs) == 0 {
-		if !help {
-			myMessage(MYF_ME_BELL, "No replace options given")
-		}
-		os.Exit(0) // Don't use as pipe
+	if len(fromToPairs) == 0 && len(finalFileNames) == 0 && !help {
+		myMessage(MYF_ME_BELL, "No replace options given")
+		os.Exit(0)
 	}
 
-	var fromArray, toArray PointerArray
-	// Mimic get_replace_strings C function logic
-	if len(parsedArgs)%2 != 0 {
+	// If no explicit files were given, but there are remaining args (which must be from/to pairs),
+	// and the number of from/to pairs is odd, it's an error.
+	if len(finalFileNames) == 0 && len(fromToPairs)%2 != 0 {
 		myMessage(MYF_ME_BELL, "No to-string for last from-string")
 		os.Exit(1)
 	}
 
-	for i := 0; i < len(parsedArgs); i += 2 {
-		if err := fromArray.insertPointerName(parsedArgs[i]); err != nil { // Insert 'from' string
+	var fromArray, toArray PointerArray
+	for i := 0; i < len(fromToPairs); i += 2 {
+		if err := fromArray.insertPointerName(fromToPairs[i]); err != nil {
 			os.Exit(1)
 		}
-		if err := toArray.insertPointerName(parsedArgs[i+1]); err != nil { // Insert 'to' string
+		if err := toArray.insertPointerName(fromToPairs[i+1]); err != nil {
 			os.Exit(1)
 		}
 	}
 
 	wordEndChars := make([]byte, 0, 256)
 	for i := 1; i < 256; i++ {
-		if myIsspace(nil, rune(i)) { // Check if character is a space character
+		if myIsspace(nil, rune(i)) {
 			wordEndChars = append(wordEndChars, byte(i))
 		}
 	}
@@ -1228,28 +1238,29 @@ func main() {
 		log.Fatalf("Failed to initialize replace: %v", err)
 	}
 
-	fromArray.freePointerArray() // Free memory for from_array
-	toArray.freePointerArray()   // Free memory for to_array
+	fromArray.freePointerArray()
+	toArray.freePointerArray()
 
-	if err := initializeBuffer(); err != nil { // Initialize I/O buffers
+	if err := initializeBuffer(); err != nil {
 		os.Exit(1)
 	}
 
 	errorVal := 0
-	fileArgs := parsedArgs[fromArray.Typelib.Count*2:] // Files are after from/to pairs
-	if len(fileArgs) == 0 {
-		errorVal = convertPipe(replace, os.Stdin, os.Stdout) // Process stdin/stdout if no files provided
+	if len(finalFileNames) == 0 {
+		// No explicit filenames means process stdin to stdout
+		errorVal = convertPipe(replace, os.Stdin, os.Stdout)
 	} else {
-		for _, fileName := range fileArgs {
-			errorVal = convertFile(replace, fileName) // Process each specified file
+		// Process each specified file
+		for _, fileName := range finalFileNames {
+			errorVal = convertFile(replace, fileName)
 			if errorVal != 0 {
 				break
 			}
 		}
 	}
 
-	freeBuffer()   // Free I/O buffers
-	myEnd(verbose) // Perform cleanup and final status message
+	freeBuffer()
+	myEnd(verbose)
 	if errorVal != 0 {
 		os.Exit(2)
 	}
