@@ -404,7 +404,7 @@ func findSet(rss *RepSets, find *RepSet) int16 {
 	return int16(rss.Count - 1)
 }
 
-func initReplace(from []string, to []string, count uint, wordEndChars string) (*Replace, error) {
+func initReplace(from []string, to []string, count uint, wordEndChars string) ([]Replace, []ReplaceString, error) {
 	log.Printf("initReplace: Initializing DFA for %d replacement pairs", count)
 	var (
 		states     uint = 2
@@ -416,7 +416,7 @@ func initReplace(from []string, to []string, count uint, wordEndChars string) (*
 		currentLen = replaceLen(from[i])
 		if currentLen == 0 {
 			myMessage(0, "No from-string with length 0")
-			return nil, fmt.Errorf("empty from-string at index %d", i)
+			return nil, nil, fmt.Errorf("empty from-string at index %d", i)
 		}
 		states += currentLen + 1
 		resultLen += uint(len(to[i])) + 1
@@ -436,62 +436,68 @@ func initReplace(from []string, to []string, count uint, wordEndChars string) (*
 
 	var rss RepSets
 	if err := rss.initSets(states); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer rss.freeSets()
 
 	foundSets = 0
-	foundSet := make([]FoundSet, maxLength*count)
+	foundSet := make([]FoundSet, maxLength*count+10) // Add some buffer
 
-	_ = rss.makeNewSet()
+	// Create the initial state (this will be at index 0 in set_buffer)
+	initialSet := rss.makeNewSet()
+	if initialSet == nil {
+		return nil, nil, fmt.Errorf("failed to create initial set")
+	}
 
+	// Make initial set invisible (this shifts the working sets)
 	rss.makeSetsInvisible()
 
-	tempRepSetForCopy := &RepSet{Bits: make([]uint, rss.SizeOfBits), SizeOfBits: rss.SizeOfBits}
-
-	wordStates := rss.makeNewSet()
-	if wordStates == nil {
-		return nil, fmt.Errorf("failed to create wordStates")
-	}
-	startStates := rss.makeNewSet()
-	if startStates == nil {
-		return nil, fmt.Errorf("failed to create startStates")
+	// Now create the working sets
+	wordStates := rss.makeNewSet()  // This becomes sets.set[0]
+	startStates := rss.makeNewSet() // This becomes sets.set[1]
+	if wordStates == nil || startStates == nil {
+		return nil, nil, fmt.Errorf("failed to create word/start states")
 	}
 
 	follows := make([]Follows, states+2)
 
-	currentNFAStateIdx := uint(1)
+	// Build the follows array - this is the NFA representation
+	currentNFAStateIdx := uint(1) // Start from state 1
 	for i := uint(0); i < count; i++ {
-		if len(from[i]) >= 2 && from[i][0] == '\\' {
-			if from[i][1] == '^' {
+		fromStr := from[i]
+
+		// Handle special start patterns
+		if len(fromStr) >= 2 && fromStr[0] == '\\' {
+			if fromStr[1] == '^' {
 				startStates.internalSetBit(currentNFAStateIdx + 1)
-				if len(from[i]) == 2 {
-					if startStates.TableOffset == math.MaxUint32 {
-						startStates.TableOffset = i
-						startStates.FoundOffset = 1
-					}
+				if len(fromStr) == 2 {
+					startStates.TableOffset = i
+					startStates.FoundOffset = 1
 				}
-			} else if from[i][1] == '$' {
+			} else if fromStr[1] == '$' {
 				startStates.internalSetBit(currentNFAStateIdx)
 				wordStates.internalSetBit(currentNFAStateIdx)
-				if len(from[i]) == 2 && startStates.TableOffset == math.MaxUint32 {
+				if len(fromStr) == 2 {
 					startStates.TableOffset = i
 					startStates.FoundOffset = 0
 				}
-			} else {
+			} else if fromStr[1] == 'b' && len(fromStr) > 2 {
 				startStates.internalSetBit(currentNFAStateIdx + 1)
+			} else {
+				startStates.internalSetBit(currentNFAStateIdx)
 			}
 		} else {
 			startStates.internalSetBit(currentNFAStateIdx)
 		}
 		wordStates.internalSetBit(currentNFAStateIdx)
 
+		// Process each character in the from-string
 		currentStrLen := uint(0)
-		for charIdx := 0; charIdx < len(from[i]); {
-			chrCode := int(from[i][charIdx])
-			if from[i][charIdx] == '\\' && charIdx+1 < len(from[i]) {
+		for charIdx := 0; charIdx < len(fromStr); {
+			chrCode := int(fromStr[charIdx])
+			if fromStr[charIdx] == '\\' && charIdx+1 < len(fromStr) {
 				charIdx++
-				switch from[i][charIdx] {
+				switch fromStr[charIdx] {
 				case 'b':
 					chrCode = SpaceChar
 				case '^':
@@ -505,7 +511,7 @@ func initReplace(from []string, to []string, count uint, wordEndChars string) (*
 				case 'v':
 					chrCode = '\v'
 				default:
-					chrCode = int(from[i][charIdx])
+					chrCode = int(fromStr[charIdx])
 				}
 			}
 			follows[currentNFAStateIdx].Chr = chrCode
@@ -515,52 +521,66 @@ func initReplace(from []string, to []string, count uint, wordEndChars string) (*
 			currentNFAStateIdx++
 			charIdx++
 		}
-		follows[currentNFAStateIdx].Chr = 0
+		// Add the final state for this pattern
+		follows[currentNFAStateIdx].Chr = 0 // End marker
 		follows[currentNFAStateIdx].TableOffset = i
 		follows[currentNFAStateIdx].Len = currentStrLen
 		currentNFAStateIdx++
 	}
 
+	// Initialize the sets properly
+	startStates.TableOffset = math.MaxUint32
+	wordStates.TableOffset = math.MaxUint32
+
+	// Build the DFA from the NFA
+	tempRepSetForCopy := &RepSet{Bits: make([]uint, rss.SizeOfBits), SizeOfBits: rss.SizeOfBits}
+
 	for setNr := uint(0); setNr < rss.Count; setNr++ {
 		currentSet := &rss.Set[setNr]
 		log.Printf("initReplace: Processing set %d (Count: %d)", setNr, rss.Count)
 
+		// Find the default state for this set
 		defaultState := int16(0)
-
 		for i := uint(math.MaxUint32); ; {
 			i = currentSet.getNextBit(i)
 			if i == 0 {
 				break
 			}
-			if follows[i].Chr == 0 {
+			if int(i) < len(follows) && follows[i].Chr == 0 {
 				if defaultState == 0 {
-					defaultState = findFound(foundSet, currentSet.TableOffset, currentSet.FoundOffset+1)
-					log.Printf("initReplace: Set %d: Default state set to %d (foundSet index: %d)", setNr, defaultState, -defaultState-2)
+					defaultState = findFound(foundSet, follows[i].TableOffset, int(follows[i].Len))
+					log.Printf("initReplace: Set %d: Found end state, defaultState=%d", setNr, defaultState)
 				}
 			}
 		}
 
+		// Copy current set for processing
 		tempRepSetForCopy.copyBits(currentSet)
 
+		// If no default state, or with the invisible initial set
 		if defaultState == 0 {
 			tempRepSetForCopy.orBits(&rss.SetBuffer[0])
 		}
 
+		// Find all characters that can transition from this state
 		usedChars := [LastCharCode]bool{}
 		for i := uint(math.MaxUint32); ; {
 			i = tempRepSetForCopy.getNextBit(i)
 			if i == 0 {
 				break
 			}
-			usedChars[follows[i].Chr] = true
-			if (follows[i].Chr == SpaceChar && follows[i].Len > 1 &&
-				(i+1 >= uint(len(follows)) || follows[i+1].Chr == 0)) ||
-				follows[i].Chr == EndOfLine {
-				usedChars[0] = true
+			if int(i) < len(follows) {
+				usedChars[follows[i].Chr] = true
+				// Special handling for SPACE_CHAR and END_OF_LINE
+				if (follows[i].Chr == SpaceChar && follows[i].Len > 1 &&
+					(int(i+1) >= len(follows) || follows[i+1].Chr == 0)) ||
+					follows[i].Chr == EndOfLine {
+					usedChars[0] = true
+				}
 			}
 		}
-		// log.Printf("initReplace: Set %d: Used chars: %v", setNr, usedChars)
 
+		// If SPACE_CHAR is used, mark all word-end characters as used
 		if usedChars[SpaceChar] {
 			for charCode := 0; charCode < 256; charCode++ {
 				if isWordEnd[byte(charCode)] {
@@ -569,17 +589,18 @@ func initReplace(from []string, to []string, count uint, wordEndChars string) (*
 			}
 		}
 
+		// Build transitions for each character
 		for chr := 0; chr < 256; chr++ {
 			if !usedChars[chr] {
 				currentSet.Next[chr] = defaultState
 			} else {
 				newSet := rss.makeNewSet()
 				if newSet == nil {
-					log.Printf("ERROR: makeNewSet returned nil during DFA construction for char %d\n", chr)
-					return nil, fmt.Errorf("failed to make new set for character %d", chr)
+					return nil, nil, fmt.Errorf("failed to make new set for character %d", chr)
 				}
 
-				currentSet = &rss.Set[setNr] // Re-get currentSet as makeNewSet might reallocate underlying array
+				// Re-get currentSet as makeNewSet might reallocate
+				currentSet = &rss.Set[setNr]
 
 				newSet.TableOffset = currentSet.TableOffset
 				newSet.FoundLen = currentSet.FoundLen
@@ -587,10 +608,14 @@ func initReplace(from []string, to []string, count uint, wordEndChars string) (*
 
 				foundEnd := uint(0)
 
+				// Process transitions for this character
 				for i := uint(math.MaxUint32); ; {
 					i = tempRepSetForCopy.getNextBit(i)
 					if i == 0 {
 						break
+					}
+					if int(i) >= len(follows) {
+						continue
 					}
 
 					canTransition := false
@@ -599,7 +624,7 @@ func initReplace(from []string, to []string, count uint, wordEndChars string) (*
 					} else if follows[i].Chr == chr {
 						canTransition = true
 					} else if follows[i].Chr == SpaceChar && (isWordEnd[byte(chr)] ||
-						(chr == 0 && follows[i].Len > 1 && (i+1 >= uint(len(follows)) || follows[i+1].Chr == 0))) {
+						(chr == 0 && follows[i].Len > 1 && (int(i+1) >= len(follows) || follows[i+1].Chr == 0))) {
 						canTransition = true
 					} else if follows[i].Chr == EndOfLine && chr == 0 {
 						canTransition = true
@@ -608,7 +633,7 @@ func initReplace(from []string, to []string, count uint, wordEndChars string) (*
 					}
 
 					if canTransition {
-						if (chr == 0 || (follows[i].Chr != 0 && (i+1 >= uint(len(follows)) || follows[i+1].Chr == 0))) &&
+						if (chr == 0 || (follows[i].Chr != 0 && (int(i+1) >= len(follows) || follows[i+1].Chr == 0))) &&
 							follows[i].Len > foundEnd {
 							foundEnd = follows[i].Len
 						}
@@ -630,22 +655,22 @@ func initReplace(from []string, to []string, count uint, wordEndChars string) (*
 						if i == 0 {
 							break
 						}
+						if int(i) >= len(follows) {
+							continue
+						}
 
 						bitNr := i
 						if (follows[i].Chr == SpaceChar || follows[i].Chr == EndOfLine) && chr == 0 {
 							bitNr = i + 1
 						}
 
-						if follows[bitNr-1].Len < foundEnd ||
-							(newSet.FoundLen != 0 && (chr == 0 || follows[bitNr].Chr != 0)) {
+						if int(bitNr) == 0 || follows[bitNr-1].Len < foundEnd ||
+							(newSet.FoundLen != 0 && (chr == 0 || (int(bitNr) < len(follows) && follows[bitNr].Chr != 0))) {
 							newSet.internalClearBit(i)
 						} else {
-							if chr == 0 ||
-								follows[bitNr].Chr == 0 {
+							if chr == 0 || (int(bitNr) < len(follows) && follows[bitNr].Chr == 0) {
 								newSet.TableOffset = follows[bitNr].TableOffset
-								if chr != 0 ||
-									(follows[i].Chr == SpaceChar ||
-										follows[i].Chr == EndOfLine) {
+								if chr != 0 || (follows[i].Chr == SpaceChar || follows[i].Chr == EndOfLine) {
 									newSet.FoundOffset = int(foundEnd)
 								}
 								newSet.FoundLen = foundEnd
@@ -655,18 +680,16 @@ func initReplace(from []string, to []string, count uint, wordEndChars string) (*
 					}
 
 					if bitsSetCount == 1 {
-						currentSet.Next[chr] = findFound(foundSet,
-							newSet.TableOffset,
-							newSet.FoundOffset)
+						currentSet.Next[chr] = findFound(foundSet, newSet.TableOffset, newSet.FoundOffset)
 						rss.freeLastSet()
-						log.Printf("initReplace: Set %d, Char %d: Found match, next state is %d (foundSet index: %d)", setNr, chr, currentSet.Next[chr], -currentSet.Next[chr]-2)
+						log.Printf("initReplace: Set %d, Char %d: Found final match, next state is %d", setNr, chr, currentSet.Next[chr])
 					} else {
 						currentSet.Next[chr] = findSet(&rss, newSet)
-						log.Printf("initReplace: Set %d, Char %d: Next state is %d (new set)", setNr, chr, currentSet.Next[chr])
+						log.Printf("initReplace: Set %d, Char %d: Next state is %d (found end, multiple bits)", setNr, chr, currentSet.Next[chr])
 					}
 				} else {
 					currentSet.Next[chr] = findSet(&rss, newSet)
-					log.Printf("initReplace: Set %d, Char %d: Next state is %d (existing set)", setNr, chr, currentSet.Next[chr])
+					log.Printf("initReplace: Set %d, Char %d: Next state is %d (no found end)", setNr, chr, currentSet.Next[chr])
 				}
 			}
 		}
@@ -675,12 +698,16 @@ func initReplace(from []string, to []string, count uint, wordEndChars string) (*
 	totalReplaceStates := rss.Count
 	totalReplaceStrings := foundSets + 1
 
+	log.Printf("initReplace: Building final structures: %d states, %d replace strings", totalReplaceStates, totalReplaceStrings)
+
 	replaces := make([]Replace, totalReplaceStates)
 	replaceStrings := make([]ReplaceString, totalReplaceStrings)
 
+	// Set up the sentinel
 	replaceStrings[0].Found = 1
 	replaceStrings[0].ReplaceString = ""
 
+	// Build the replace strings
 	for i := uint(1); i <= foundSets; i++ {
 		fromStr := from[foundSet[i-1].TableOffset]
 
@@ -697,6 +724,7 @@ func initReplace(from []string, to []string, count uint, wordEndChars string) (*
 			i, fromStr, replaceStrings[i].ReplaceString, replaceStrings[i].ToOffset, replaceStrings[i].FromOffset)
 	}
 
+	// Build the transition table
 	for i := uint(0); i < totalReplaceStates; i++ {
 		for j := 0; j < 256; j++ {
 			cNext := rss.Set[i].Next[j]
@@ -705,7 +733,7 @@ func initReplace(from []string, to []string, count uint, wordEndChars string) (*
 			} else {
 				rsIndex := -cNext - 2
 				if rsIndex < 0 || uint(rsIndex) >= totalReplaceStrings {
-					return nil, fmt.Errorf("invalid ReplaceString index calculated: %d", rsIndex)
+					return nil, nil, fmt.Errorf("invalid ReplaceString index calculated: %d", rsIndex)
 				}
 				replaces[i].Next[j] = &replaceStrings[rsIndex]
 			}
@@ -713,7 +741,7 @@ func initReplace(from []string, to []string, count uint, wordEndChars string) (*
 	}
 
 	log.Printf("Replace table has %d states, %d replace strings", rss.Count, foundSets)
-	return &replaces[0], nil
+	return replaces, replaceStrings, nil
 }
 
 // --- Buffer Management for I/O ---
@@ -1287,7 +1315,7 @@ func main() {
 		}
 	}
 
-	replace, err := initReplace(fromArray.Typelib.TypeNames, toArray.Typelib.TypeNames, fromArray.Typelib.Count, string(wordEndChars))
+	replaces, replaceStringStructs, err := initReplace(fromArray.Typelib.TypeNames, toArray.Typelib.TypeNames, fromArray.Typelib.Count, string(wordEndChars))
 	if err != nil {
 		log.Fatalf("Failed to initialize replace: %v", err)
 	}
@@ -1302,11 +1330,11 @@ func main() {
 	errorVal := 0
 	if len(finalFileNames) == 0 {
 		// No explicit filenames means process stdin to stdout
-		errorVal = convertPipe(replace, os.Stdin, os.Stdout)
+		errorVal = convertPipe(replace, replaceStringStructs, os.Stdin, os.Stdout)
 	} else {
 		// Process each specified file
 		for _, fileName := range finalFileNames {
-			errorVal = convertFile(replace, fileName)
+			errorVal = convertFile(replace, replaceStringStructs, fileName)
 			if errorVal != 0 {
 				break
 			}
