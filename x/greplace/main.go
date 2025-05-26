@@ -22,7 +22,8 @@ const (
 	SetMallocHunc = 64
 )
 
-// --- MYF_ Flags (Ensuring these are defined globally before any usage) ---
+// --- MYF_ Flags
+// (Ensuring these are defined globally before any usage) ---
 const (
 	MYF_ME_BELL     = 1 << 0
 	MYF_MY_WME      = 1 << 1
@@ -103,12 +104,10 @@ var (
 	bufRead  int    // `static int bufread;` - Number of bytes to get with each read().
 	myEOF    int    // `static int my_eof;` - Replaced C's `my_eof` (which was an int flag)
 	bufAlloc uint   // `static uint bufalloc;` - Allocated size of `buffer`.
-
 	// Output buffer
-	outBuff   []byte // `static char *out_buff;`
-	outLength uint   // `static uint out_length;` - Allocated size of `out_buff`.
-
-	foundSets uint = 0 // `static uint found_sets=0;` - Count of unique found match results
+	outBuff   []byte     // `static char *out_buff;`
+	outLength uint       // `static uint out_length;` - Allocated size of `out_buff`.
+	foundSets uint   = 0 // `static uint found_sets=0;` - Count of unique found match results
 )
 
 // --- Functions related to PointerArray ---
@@ -203,7 +202,8 @@ func (to *RepSet) copyBits(from *RepSet) {
 }
 
 func cmpBits(set1, set2 *RepSet) int {
-	if set1.SizeOfBits != set2.SizeOfBits || len(set1.Bits) != len(set2.Bits) {
+	if set1.SizeOfBits != set2.SizeOfBits ||
+		len(set1.Bits) != len(set2.Bits) {
 		return 1
 	}
 	for i := uint(0); i < set1.SizeOfBits; i++ {
@@ -391,7 +391,7 @@ func findFound(foundSet []FoundSet, tableOffset uint, foundOffset int) int16 {
 	foundSet[foundSets].TableOffset = tableOffset
 	foundSet[foundSets].FoundOffset = foundOffset
 	foundSets++
-	return int16(-foundSets - 1) // Return new packed index. C's `(-i-2)` becomes `-(foundSets-1)-2 = -foundSets-1` for the new element.
+	return int16(-foundSets - 1) // Return new packed index.
 }
 
 func findSet(rss *RepSets, find *RepSet) int16 {
@@ -630,13 +630,16 @@ func initReplace(from []string, to []string, count uint, wordEndChars string) (*
 							bitNr = i + 1
 						}
 
-						if follows[bitNr-1].Len < foundEnd || (newSet.FoundLen != 0 && (chr == 0 || follows[bitNr].Chr != 0)) {
+						if follows[bitNr-1].Len < foundEnd ||
+							(newSet.FoundLen != 0 && (chr == 0 || follows[bitNr].Chr != 0)) {
 							newSet.internalClearBit(i)
 						} else {
-							if chr == 0 || follows[bitNr].Chr == 0 {
+							if chr == 0 ||
+								follows[bitNr].Chr == 0 {
 								newSet.TableOffset = follows[bitNr].TableOffset
-								if chr != 0 || (follows[i].Chr == SpaceChar ||
-									follows[i].Chr == EndOfLine) {
+								if chr != 0 ||
+									(follows[i].Chr == SpaceChar ||
+										follows[i].Chr == EndOfLine) {
 									newSet.FoundOffset = int(foundEnd)
 								}
 								newSet.FoundLen = foundEnd
@@ -715,7 +718,7 @@ func initializeBuffer() error {
 
 	outLength = uint(bufRead) // Initial size for output buffer
 	outBuff = make([]byte, outLength)
-	if outBuff == nil { // In Go, make() typically panics on OOM, so nil check is less common but good practice
+	if outBuff == nil { // In Go, make() typically panics on OOM, so nil check is less common but good
 		return fmt.Errorf("failed to allocate outBuff")
 	}
 	return nil
@@ -739,7 +742,8 @@ func freeBuffer() {
 // Fills the buffer from the reader, retaining the last `n` bytes at the beginning.
 // Returns the number of new bytes read, or -1 on error.
 func fillBufferRetaining(reader io.Reader, n int) int {
-	// DBUG_ENTER("fill_buffer_retaining"); // Go equivalent: log debug
+	// DBUG_ENTER("fill_buffer_retaining");
+	// Go equivalent: log debug
 
 	// See if we need to grow the buffer.
 	// C: `if ((int) bufalloc - n <= bufread)`
@@ -772,7 +776,8 @@ func fillBufferRetaining(reader io.Reader, n int) int {
 
 	// Read in new stuff.
 	// `if ((i=(int) my_read(fd, (uchar*) buffer + bufbytes, (size_t) bufread, MYF(MY_WME))) < 0)`
-	// `io.ReadFull` attempts to read exactly `bufRead` bytes. `reader.Read` reads up to `bufRead` bytes.
+	// `io.ReadFull` attempts to read exactly `bufRead` bytes.
+	// `reader.Read` reads up to `bufRead` bytes.
 	// The C `my_read` reads exactly `bufread` bytes if possible or returns less/error.
 	// `reader.Read` is closer to `my_read`'s behavior (reads up to len(p) bytes).
 	nRead, err := reader.Read(buffer[bufBytes : bufBytes+bufRead])
@@ -786,7 +791,8 @@ func fillBufferRetaining(reader io.Reader, n int) int {
 	// C: `if (i == 0 && bufbytes > 0 && buffer[bufbytes - 1] != '\n')`
 	if nRead == 0 && bufBytes > 0 && buffer[bufBytes-1] != '\n' {
 		myEOF = 1 // Mark EOF
-		// C: `my_eof = i = 1; buffer[bufbytes] = '\n';`
+		// C: `my_eof = i = 1;
+		// buffer[bufbytes] = '\n';`
 		// This means it pretends to read 1 byte (`\n`) if it was EOF and didn't end with newline.
 		// This is a special case for `grep`-like behavior.
 		buffer[bufBytes] = '\n'
@@ -802,7 +808,8 @@ func fillBufferRetaining(reader io.Reader, n int) int {
 // replaceStrings translates C's `replace_strings`.
 // The core function that performs string replacements using the DFA.
 // It modifies `out` (which points to `outBuff`) and adjusts `max_length` (`outLength`).
-// Returns the actual length of the data written to `outBuff`, or -1 on error. (Using math.MaxUint32 for -1)
+// Returns the actual length of the data written to `outBuff`, or -1 on error.
+// (Using math.MaxUint32 for -1)
 func replaceStrings(rep *Replace, out *[]byte, maxLength *uint, from []byte) uint {
 	// CORRECTED: repPos must be an interface{} to allow type assertions to both *Replace and *ReplaceString.
 	var repPos interface{}
@@ -857,7 +864,6 @@ func replaceStrings(rep *Replace, out *[]byte, maxLength *uint, from []byte) uin
 		// A match or end of line reached. `repPos` is either a `*ReplaceString` (found match)
 		// or, if `repPos.Found` became true for a `*Replace` struct, it's an error.
 		// The DFA construction should ensure `Found == true` only for `*ReplaceString` or `rep` (base).
-
 		repString, isReplaceString := repPos.(*ReplaceString)
 
 		// C: `if (!(rep_str = ((REPLACE_STRING*) rep_pos))->replace_string)`
@@ -911,7 +917,8 @@ func replaceStrings(rep *Replace, out *[]byte, maxLength *uint, from []byte) uin
 // convertPipe translates C's `convert_pipe`.
 // Processes input from a reader (stdin) to a writer (stdout).
 func convertPipe(rep *Replace, in io.Reader, out io.Writer) int {
-	// DBUG_ENTER("convert_pipe"); // Go equivalent: log debug
+	// DBUG_ENTER("convert_pipe");
+	// Go equivalent: log debug
 
 	updated = 0 // Reset global updated flag
 	retain := 0
@@ -935,7 +942,8 @@ func convertPipe(rep *Replace, in io.Reader, out io.Writer) int {
 		// Go strings/slices don't rely on null terminators.
 		// But the DFA logic uses `0` as end-of-string character.
 		// Ensure a conceptual null terminator at `buffer[bufBytes]` for DFA logic.
-		// Make sure `buffer` has capacity for `bufBytes+1`. `bufAlloc+1` should cover it.
+		// Make sure `buffer` has capacity for `bufBytes+1`.
+		// `bufAlloc+1` should cover it.
 		if bufBytes < len(buffer) {
 			buffer[bufBytes] = 0
 		}
@@ -950,12 +958,14 @@ func convertPipe(rep *Replace, in io.Reader, out io.Writer) int {
 			}
 
 			if endOfLinePtr == bufBytes { // Reached end of currently buffered data
-				// C: `retain= (int) (end_of_line - start_of_line); break;`
+				// C: `retain= (int) (end_of_line - start_of_line);
+				// break;`
 				retain = bufBytes - startOfLinePtr // Amount to retain for next read
 				break                              // Break inner loop, go read more data
 			}
 
-			// C: `save_char=end_of_line[0]; end_of_line[0]=0; end_of_line++;`
+			// C: `save_char=end_of_line[0];
+			// end_of_line[0]=0; end_of_line++;`
 			saveChar := buffer[endOfLinePtr] // Save the newline or null char
 			// `buffer[endOfLinePtr] = 0` is conceptually done when we pass a subslice
 			// (or handle it as a sentinel for DFA).
@@ -1033,8 +1043,7 @@ func convertFile(rep *Replace, name string) int {
 	tempname := tempFile.Name() // Get the name of the temporary file
 	defer os.Remove(tempname)   // Ensure temp file is cleaned up if rename fails or exits early
 
-	out = tempFile // os.CreateTemp returns *os.File, which can be used directly as a writer.
-
+	out = tempFile                        // os.CreateTemp returns *os.File, which can be used directly as a writer.
 	errorVal := convertPipe(rep, in, out) // Perform replacement
 	out.Close()                           // Explicitly close output before rename/delete
 
@@ -1096,7 +1105,8 @@ func myEnd(flags int) {
 			fmt.Println("Program finished with updates.")
 		}
 	}
-	// In Go, defer statements handle resource cleanup; os.Exit terminates.
+	// In Go, defer statements handle resource cleanup;
+	// os.Exit terminates.
 }
 
 // Dummy for `strcmp` from C's `string.h` for use in `getReplaceStrings`
@@ -1106,7 +1116,8 @@ func myStrcmp(s1, s2 string) int {
 
 // Dummy for `my_isspace` from `m_ctype.h` for use in `main`.
 func myIsspace(charset interface{}, r rune) bool {
-	return r == ' ' || r == '\t' || r == '\n' || r == '\r' || r == '\v' || r == '\f'
+	return r == ' ' || r == '\t' || r == '\n' ||
+		r == '\r' || r == '\v' || r == '\f'
 }
 
 // `my_disable_symlinks` from C's `my_sys.h`
@@ -1114,3 +1125,133 @@ var myDisableSymlinks = false
 
 // `my_progname` from C's `my_global.h`
 var myProgname = "replace_strings" // Default, will be set in main
+
+func main() {
+	myInit(os.Args[0]) // Initialize program name for logging
+
+	// Handle command-line arguments.
+	// In C, static_get_options modifies argc and argv. In Go, we'll process os.Args.
+	// We'll mimic the C option parsing here.
+	args := os.Args[1:] // Skip the program name
+	parsedArgs := []string{}
+	help := false
+	version := false
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if len(arg) > 1 && arg[0] == '-' && arg[1] != '-' {
+			for j := 1; j < len(arg); j++ {
+				switch arg[j] {
+				case 's':
+					silent = 1 // Set silent flag
+				case 'v':
+					verbose = 1 // Set verbose flag
+				case '#':
+					// DBUG_PUSH logic from C; in Go, we might use log.SetOutput for debug
+					// For now, just skip the rest of the current argument.
+					log.Println("Debug flag detected, skipping remaining argument for DBUG_PUSH equivalent.")
+					goto nextArg // Break from inner loop and move to next outer arg
+				case 'V':
+					version = true // Set version flag
+					fallthrough
+				case 'I', '?':
+					help = true                                                           // Set help flag
+					fmt.Printf("%s  Ver 1.4 for %s at %s\n", myProgname, "Go", "Unknown") // Placeholder for system info
+					if version {
+						break
+					}
+					fmt.Println("This software comes with ABSOLUTELY NO WARRANTY. This is free software,\nand you are welcome to modify and redistribute it under the GPL license\n")
+					fmt.Println("This program replaces strings in files or from stdin to stdout.\n" +
+						"It accepts a list of from-string/to-string pairs and replaces\n" +
+						"each occurrence of a from-string with the corresponding to-string.\n" +
+						"The first occurrence of a found string is matched. If there is\n" +
+						"more than one possibility for the string to replace, longer\n" +
+						"matches are preferred before shorter matches.\n\n" +
+						"A from-string can contain these special characters:\n" +
+						"  \\^      Match start of line.\n" +
+						"  \\$      Match end of line.\n" +
+						"  \\b      Match space-character, start of line or end of line.\n" +
+						"          For a end \\b the next replace starts locking at the end\n" +
+						"          space-character. A \\b alone in a string matches only a\n" +
+						"          space-character.\n")
+					fmt.Printf("Usage: %s [-?svIV] from to from to ... -- [files]\n", myProgname)
+					fmt.Println("or")
+					fmt.Printf("Usage: %s [-?svIV] from to from to ... < fromfile > tofile\n", myProgname)
+					fmt.Println("")
+					fmt.Println("Options: -? or -I \"Info\"  -s \"silent\"      -v \"verbose\"")
+					break
+				default:
+					fmt.Fprintf(os.Stderr, "illegal option: -%c\n", arg[j])
+					os.Exit(1)
+				}
+			}
+		} else if arg == "--" { // Stop option parsing after "--"
+			parsedArgs = append(parsedArgs, args[i+1:]...) // Add remaining arguments as file names
+			break
+		} else {
+			parsedArgs = append(parsedArgs, arg) // Add non-option argument
+		}
+	nextArg:
+	}
+
+	if len(parsedArgs) == 0 {
+		if !help {
+			myMessage(MYF_ME_BELL, "No replace options given")
+		}
+		os.Exit(0) // Don't use as pipe
+	}
+
+	var fromArray, toArray PointerArray
+	// Mimic get_replace_strings C function logic
+	if len(parsedArgs)%2 != 0 {
+		myMessage(MYF_ME_BELL, "No to-string for last from-string")
+		os.Exit(1)
+	}
+
+	for i := 0; i < len(parsedArgs); i += 2 {
+		if err := fromArray.insertPointerName(parsedArgs[i]); err != nil { // Insert 'from' string
+			os.Exit(1)
+		}
+		if err := toArray.insertPointerName(parsedArgs[i+1]); err != nil { // Insert 'to' string
+			os.Exit(1)
+		}
+	}
+
+	wordEndChars := make([]byte, 0, 256)
+	for i := 1; i < 256; i++ {
+		if myIsspace(nil, rune(i)) { // Check if character is a space character
+			wordEndChars = append(wordEndChars, byte(i))
+		}
+	}
+
+	replace, err := initReplace(fromArray.Typelib.TypeNames, toArray.Typelib.TypeNames, fromArray.Typelib.Count, string(wordEndChars))
+	if err != nil {
+		log.Fatalf("Failed to initialize replace: %v", err)
+	}
+
+	fromArray.freePointerArray() // Free memory for from_array
+	toArray.freePointerArray()   // Free memory for to_array
+
+	if err := initializeBuffer(); err != nil { // Initialize I/O buffers
+		os.Exit(1)
+	}
+
+	errorVal := 0
+	fileArgs := parsedArgs[fromArray.Typelib.Count*2:] // Files are after from/to pairs
+	if len(fileArgs) == 0 {
+		errorVal = convertPipe(replace, os.Stdin, os.Stdout) // Process stdin/stdout if no files provided
+	} else {
+		for _, fileName := range fileArgs {
+			errorVal = convertFile(replace, fileName) // Process each specified file
+			if errorVal != 0 {
+				break
+			}
+		}
+	}
+
+	freeBuffer()   // Free I/O buffers
+	myEnd(verbose) // Perform cleanup and final status message
+	if errorVal != 0 {
+		os.Exit(2)
+	}
+	os.Exit(0)
+}
