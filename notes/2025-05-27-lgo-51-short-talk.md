@@ -57,7 +57,7 @@ Other:
 * throwaway code, prototypes, able to skip stuff I am not interested in
 * just like SO, it's all fine as long as you understand every line (up to some granularity)
 
-## trcli
+## trcli ✓
 
 Wanted to have a CLI tool for accessing TRELLO board and printing out.
 
@@ -65,7 +65,7 @@ Wanted to have a CLI tool for accessing TRELLO board and printing out.
 
 ![](../static/trcli-demo.gif)
 
-## cli palm tree
+## cli palm tree ❌
 
 * I love palm trees and the cli
 * can I get a palm tree into my terminal?
@@ -75,7 +75,7 @@ Short answer: not really
 
 ![](../x/palmeval/palm-montage.png)
 
-### llmexp
+### llmexp ✓
 
 Wrote llmexp to run the same query against different models.
 
@@ -85,12 +85,12 @@ llama-3.3-70b-instruct,gemma-3-27b-it,mistral-large-instruct,qwen3-32b,qwen2.5-c
 -user-file experiments/exp-0000.md -save-md ...
 ```
 
-## api refactoring
+## api refactoring ✓
 
 * use of transitioning from one API to another, tedious repetitive rewrite; test available
 * mostly helpful
 
-## metha feature
+## metha feature ✓
 
 * command line harvester for XML data; wanted zstd support
 * codebase existing and familiar
@@ -111,7 +111,7 @@ func compressedFilename(base string, compressionType CompressionType) string {
 }
 ```
 
-Changed less than 100 SLOC.
+Changed less than 100 SLOC (fb0adac5-a99f-4a54-9636-b88618d7f172).
 
 
 ```
@@ -121,7 +121,22 @@ $ git diff --stat 0a5555b4 -- harvest.go client.go cmd/metha-sync/main.go
  2 files changed, 60 insertions(+), 7 deletions(-)
 ```
 
-## replace.c port to Go
+## indigo.py port to Go ❌
+
+* port python to go and extend features: infer JSON schema from multiple docs: https://github.com/miku/indigo✓
+* port somewhat worked
+
+> I think this implementation may have a memory  issue; memory usage may grow
+> linearly with the input - albeit is should be possible to keep it linear in
+> the size of the resulting struct
+
+...
+
+> You're absolutely right. The current implementation loads all JSON documents
+> into memory before processing, which could cause problems with large
+> datasets.
+
+## replace.c port to Go ❌
 
 * Claude 4, Gemini 2.5 (flash, pro) did not crack it
 * step by step approach
