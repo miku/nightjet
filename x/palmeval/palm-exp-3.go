@@ -1,0 +1,35 @@
+package main
+
+import (
+	"fmt"
+	"math/rand"
+	"time"
+)
+
+func main() {
+	rand.Seed(time.Now().UnixNano())
+	h := rand.Intn(10) + 15
+	t := rand.Intn(3) + 3
+	s := rand.Intn(2) + 1
+
+	for i := 0; i < h; i++ {
+		fmt.Print("\033[32m")
+		for j := 0; j < s; j++ {
+			fmt.Print(" ")
+		}
+		fmt.Print("|")
+		fmt.Println("\033[0m")
+	}
+
+	for i := 0; i < t; i++ {
+		fmt.Print("\033[32m")
+		for j := 0; j < s-i-1; j++ {
+			fmt.Print(" ")
+		}
+		fmt.Print("/")
+		for j := 0; j < 2*i+1; j++ {
+			fmt.Print("Y")
+		}
+		fmt.Println("\\\033[0m")
+	}
+}

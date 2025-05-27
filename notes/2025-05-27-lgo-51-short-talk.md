@@ -34,6 +34,22 @@ Testing various open models:
 > the ability of LLMs. [A Survey on In-context
 > Learning](https://arxiv.org/pdf/2301.00234) (2024)
 
+Other:
+
+* SWE-Bench (2023): https://arxiv.org/pdf/2310.06770, https://github.com/SWE-bench/SWE-bench, https://www.swebench.com
+
+> To this end, we in- troduce SWE-bench, an evaluation framework consisting of
+> 2,294 software engi- neering problems drawn from real GitHub issues and
+> corresponding pull requests across 12 popular Python repositories. Given a
+> codebase along with a description of an issue to be resolved, a language
+> model is tasked with editing the codebase to address the issue
+
+> Our evaluations show that both state-of- the-art proprietary models and our
+> fine-tuned model SWE-Llama can resolve only the simplest issues. The
+> best-performing model, Claude 2, is able to solve a mere 1.96% of the issues
+
+* SWE-Bench+ (2024): https://arxiv.org/pdf/2410.06992
+
 ## TL;DR
 
 * so far, both: HITS and MISSES
@@ -52,9 +68,30 @@ Wanted to have a CLI tool for accessing TRELLO board and printing out.
 * I love palm trees and the cli
 * can I get a palm tree into my terminal?
 
-Short answer: NO!
+Short answer: not really
 
-## metha refactoring
+![](../x/palmeval/palm-exp-0.png)
+![](../x/palmeval/palm-exp-1.png)
+![](../x/palmeval/palm-exp-2.png)
+![](../x/palmeval/palm-exp-3.png)
+![](../x/palmeval/palm-exp-4.png)
+
+### llmexp
+
+Wrote llmexp to run the same query against different models.
+
+```
+$ ./llmexp -endpoint example.com/v1/chat/completions -models
+llama-3.3-70b-instruct,gemma-3-27b-it,mistral-large-instruct,qwen3-32b,qwen2.5-coder-32b-instruct,codestral-22b
+-user-file experiments/exp-0000.md -save-md ...
+```
+
+## api refactoring
+
+* use of transitioning from one API to another, tedious repetitive rewrite; test available
+* mostly helpful
+
+## metha feature
 
 * command line harvester for XML data; wanted zstd support
 * codebase existing and familiar

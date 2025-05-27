@@ -1,8 +1,8 @@
 {
-  "timestamp": "2025-05-27T14:29:36.806492065+02:00",
-  "model": "gemma-3-27b-it",
+  "timestamp": "2025-05-27T14:54:08.913204519+02:00",
+  "model": "llama-3.3-70b-instruct",
   "request": {
-    "model": "gemma-3-27b-it",
+    "model": "llama-3.3-70b-instruct",
     "messages": [
       {
         "role": "system",
@@ -18,24 +18,24 @@
     "top_p": 0.9
   },
   "response": {
-    "id": "chatcmpl-9c4956370fc643dca0a9fe492a4de88e",
+    "id": "chatcmpl-4f6420131f5043caaf3ae13c708e1e33",
     "object": "chat.completion",
-    "created": 1748348966,
-    "model": "gemma-3-27b-it",
+    "created": 1748350421,
+    "model": "llama-3.3-70b-instruct",
     "choices": [
       {
         "index": 0,
         "message": {
           "role": "assistant",
-          "content": "```go\npackage main\n\nimport (\n\t\"fmt\"\n\t\"math/rand\"\n\t\"time\"\n)\n\nfunc main() {\n\trand.Seed(time.Now().UnixNano())\n\n\tcolors := []string{\"\\033[32m\", \"\\033[33m\", \"\\033[36m\"} // Green, Yellow, Cyan\n\treset := \"\\033[0m\"\n\n\th := rand.Intn(10) + 15 // Height\n\tw := rand.Intn(5) + 5   // Width\n\n\tfor i := 0; i \u003c h; i++ {\n\t\tcolor := colors[rand.Intn(len(colors))]\n\t\tspaces := \"\"\n\t\tif i \u003c h-5 {\n\t\t\tspaces = fmt.Sprintf(\"%*s\", h-i, \" \")\n\t\t}\n\n\t\tleaves := \"\"\n\t\tnumLeaves := rand.Intn(w*2) + w\n\t\tfor j := 0; j \u003c numLeaves; j++ {\n\t\t\tleaves += \"🌿\"\n\t\t}\n\n\t\tfmt.Printf(\"%s%s%s\\n\", spaces, color, leaves+reset)\n\t}\n\n\ttrunkHeight := rand.Intn(5) + 3\n\ttrunkWidth := rand.Intn(3) + 1\n\n\tfor i := 0; i \u003c trunkHeight; i++ {\n\t\tspaces := fmt.Sprintf(\"%*s\", h-trunkHeight+i, \" \")\n\t\ttrunk := \"\"\n\t\tfor j := 0; j \u003c trunkWidth; j++ {\n\t\t\ttrunk += \"||\"\n\t\t}\n\t\tfmt.Printf(\"%s\\033[34m%s\\033[0m\\n\", spaces, trunk)\n\t}\n}\n```"
+          "content": "```go\npackage main\n\nimport (\n\t\"fmt\"\n\t\"math/rand\"\n\t\"time\"\n)\n\nfunc main() {\n\trand.Seed(time.Now().UnixNano())\n\th := rand.Intn(10) + 10\n\tw := rand.Intn(5) + 5\n\ttrunkW := rand.Intn(2) + 1\n\ttrunkH := rand.Intn(3) + 2\n\n\tfmt.Println(\"\\x1b[32m\") // green color\n\n\t// leaves\n\tfor i := 0; i \u003c h-trunkH; i++ {\n\t\ts := \"\"\n\t\tfor j := 0; j \u003c (w/2)-i; j++ {\n\t\t\ts += \" \"\n\t\t}\n\t\tfor k := 0; k \u003c 2*i+1; k++ {\n\t\t\tif rand.Intn(2) == 0 {\n\t\t\t\ts += \"*\"\n\t\t\t} else {\n\t\t\t\ts += \"+\"\n\t\t\t}\n\t\t}\n\t\tfor j := 0; j \u003c (w/2)-i; j++ {\n\t\t\ts += \" \"\n\t\t}\n\t\tfmt.Println(s)\n\t}\n\n\t// trunk\n\tfor i := 0; i \u003c trunkH; i++ {\n\t\ts := \"\"\n\t\tfor j := 0; j \u003c (w-trunkW)/2; j++ {\n\t\t\ts += \" \"\n\t\t}\n\t\tfor k := 0; k \u003c trunkW; k++ {\n\t\t\ts += \"#\"\n\t\t}\n\t\tfor j := 0; j \u003c (w-trunkW)/2; j++ {\n\t\t\ts += \" \"\n\t\t}\n\t\tfmt.Println(s)\n\t}\n\n\tfmt.Println(\"\\x1b[0m\") // reset color\n}\n```"
         }
       }
     ],
     "usage": {
-      "prompt_tokens": 269,
-      "completion_tokens": 404,
-      "total_tokens": 673
+      "prompt_tokens": 283,
+      "completion_tokens": 360,
+      "total_tokens": 643
     }
   },
-  "query_hash": "EXP0000__Write_a"
+  "query_hash": "EXP0000__Write_a_small_command_line_application_in"
 }

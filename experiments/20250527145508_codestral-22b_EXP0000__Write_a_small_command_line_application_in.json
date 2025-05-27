@@ -1,8 +1,8 @@
 {
-  "timestamp": "2025-05-27T14:32:04.119652793+02:00",
-  "model": "deepseek-r1",
+  "timestamp": "2025-05-27T14:55:08.596201434+02:00",
+  "model": "codestral-22b",
   "request": {
-    "model": "deepseek-r1",
+    "model": "codestral-22b",
     "messages": [
       {
         "role": "system",
@@ -18,17 +18,24 @@
     "top_p": 0.9
   },
   "response": {
-    "id": "",
-    "object": "",
-    "created": 0,
-    "model": "",
-    "choices": null,
+    "id": "chat-2395ccbff06648c2b45d531dfcb1c66d",
+    "object": "chat.completion",
+    "created": 1748350500,
+    "model": "codestral-22b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": " ```go\npackage main\n\nimport (\n\t\"fmt\"\n\t\"math/rand\"\n\t\"time\"\n)\n\nvar colors = []string{\"\\033[32m\", \"\\033[33m\", \"\\033[38;5;28m\"}\n\nfunc main() {\n\trand.Seed(time.Now().UnixNano())\n\ttrunkHeight := rand.Intn(5) + 3\n\tleavesHeight := rand.Intn(10) + 10\n\n\tfor i := 0; i \u003c trunkHeight; i++ {\n\t\tfmt.Println(\"   \" + colors[0] + \"|\")\n\t}\n\n\tfor i := 0; i \u003c leavesHeight; i++ {\n\t\tfmt.Print(colors[rand.Intn(3)])\n\t\tfor j := 0; j \u003c leavesHeight-i; j++ {\n\t\t\tfmt.Print(\" \")\n\t\t}\n\t\tfor k := 0; k \u003c 2*i+1; k++ {\n\t\t\tfmt.Print(\"*\")\n\t\t}\n\t\tfmt.Println()\n\t}\n\n\tfmt.Println(\"\\033[0m\")\n}\n```"
+        }
+      }
+    ],
     "usage": {
-      "prompt_tokens": 0,
-      "completion_tokens": 0,
-      "total_tokens": 0
+      "prompt_tokens": 295,
+      "completion_tokens": 296,
+      "total_tokens": 591
     }
   },
-  "query_hash": "EXP0000__Write_a",
-  "error": "request failed: context deadline exceeded (Client.Timeout exceeded while awaiting headers)"
+  "query_hash": "EXP0000__Write_a_small_command_line_application_in"
 }

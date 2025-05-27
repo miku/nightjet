@@ -1,0 +1,53 @@
+package main
+
+import (
+	"fmt"
+	"math/rand"
+	"time"
+)
+
+func main() {
+	rand.Seed(time.Now().UnixNano())
+	h := rand.Intn(10) + 10
+	w := rand.Intn(5) + 5
+	trunkW := rand.Intn(2) + 1
+	trunkH := rand.Intn(3) + 2
+
+	fmt.Println("\x1b[32m") // green color
+
+	// leaves
+	for i := 0; i < h-trunkH; i++ {
+		s := ""
+		for j := 0; j < (w/2)-i; j++ {
+			s += " "
+		}
+		for k := 0; k < 2*i+1; k++ {
+			if rand.Intn(2) == 0 {
+				s += "*"
+			} else {
+				s += "+"
+			}
+		}
+		for j := 0; j < (w/2)-i; j++ {
+			s += " "
+		}
+		fmt.Println(s)
+	}
+
+	// trunk
+	for i := 0; i < trunkH; i++ {
+		s := ""
+		for j := 0; j < (w-trunkW)/2; j++ {
+			s += " "
+		}
+		for k := 0; k < trunkW; k++ {
+			s += "#"
+		}
+		for j := 0; j < (w-trunkW)/2; j++ {
+			s += " "
+		}
+		fmt.Println(s)
+	}
+
+	fmt.Println("\x1b[0m") // reset color
+}
