@@ -63,7 +63,7 @@ Wanted to have a CLI tool for accessing TRELLO board and printing out.
 
 * 185 lines of code, [claude/chat](https://claude.ai/chat/79da6368-24b9-4d17-bbf7-df57b0219b3b)
 
-![](static/trcli-demo.gif)
+![](../static/trcli-demo.gif)
 
 ## cli palm tree
 
