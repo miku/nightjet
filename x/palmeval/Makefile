@@ -31,3 +31,4 @@ all: $(TARGETS) $(TERMSHOTS)
 .PHONY: clean
 clean:
 	rm -f $(TARGETS)
+	rm -f $(TERMSHOTS)
