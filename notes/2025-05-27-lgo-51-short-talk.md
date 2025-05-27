@@ -123,7 +123,7 @@ $ git diff --stat 0a5555b4 -- harvest.go client.go cmd/metha-sync/main.go
 
 ## indigo.py port to Go ❌
 
-* port python to go and extend features: infer JSON schema from multiple docs: https://github.com/miku/indigo✓
+* port python to go and extend features: infer JSON schema from multiple docs: https://github.com/miku/indigo
 * port somewhat worked
 
 > I think this implementation may have a memory  issue; memory usage may grow
