@@ -10,6 +10,9 @@ TERMSHOTS = palm-exp-0.png \
 		    palm-exp-3.png \
 		    palm-exp-4.png
 
+palm-montage.png:
+	montage palm-exp-{0..4}.png -tile 5x1 -geometry +0+0 palm-montage.png
+
 .PHONY: all
 all: $(TARGETS) $(TERMSHOTS)
 

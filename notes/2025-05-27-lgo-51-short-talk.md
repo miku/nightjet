@@ -63,6 +63,8 @@ Wanted to have a CLI tool for accessing TRELLO board and printing out.
 
 * 185 lines of code, [claude/chat](https://claude.ai/chat/79da6368-24b9-4d17-bbf7-df57b0219b3b)
 
+![](static/trcli-demo.gif)
+
 ## cli palm tree
 
 * I love palm trees and the cli
@@ -70,11 +72,8 @@ Wanted to have a CLI tool for accessing TRELLO board and printing out.
 
 Short answer: not really
 
-![](../x/palmeval/palm-exp-0.png)
-![](../x/palmeval/palm-exp-1.png)
-![](../x/palmeval/palm-exp-2.png)
-![](../x/palmeval/palm-exp-3.png)
-![](../x/palmeval/palm-exp-4.png)
+
+![](../x/palmeval/palm-montage.png)
 
 ### llmexp
 
