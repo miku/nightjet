@@ -119,7 +119,7 @@ func parseFlags() *Config {
 
 	var modelsFlag string
 
-	flag.StringVar(&config.APIEndpoint, "endpoint", "https://chat-ai.example.com/v1/completions", "API endpoint URL")
+	flag.StringVar(&config.APIEndpoint, "endpoint", "https://chat-ai.example.com/v1/chat/completions", "API endpoint URL")
 	flag.StringVar(&config.APIKey, "api-key", "", "API key for authentication")
 	flag.StringVar(&modelsFlag, "models", "meta-llama-3.1-8b-instruct", "Comma-separated list of models to test")
 	flag.StringVar(&config.SystemPrompt, "system", "You are an assistant.", "System prompt")
@@ -144,6 +144,7 @@ func parseFlags() *Config {
 
 	flag.Parse()
 
+	// Parse models
 	config.Models = strings.Split(modelsFlag, ",")
 	for i, model := range config.Models {
 		config.Models[i] = strings.TrimSpace(model)
@@ -156,27 +157,34 @@ func validateConfig(config *Config) error {
 	if config.APIKey == "" {
 		return fmt.Errorf("API key is required")
 	}
+
 	if config.UserPrompt == "" && config.UserFile == "" {
 		return fmt.Errorf("user prompt is required (use -user or -user-file)")
 	}
+
 	if len(config.Models) == 0 {
 		return fmt.Errorf("at least one model must be specified")
 	}
+
 	return nil
 }
 
 func runExperiment(config *Config, model string) error {
+	// Prepare request
 	messages := []Message{}
+
 	if config.SystemPrompt != "" {
 		messages = append(messages, Message{
 			Role:    "system",
 			Content: config.SystemPrompt,
 		})
 	}
+
 	messages = append(messages, Message{
 		Role:    "user",
 		Content: config.UserPrompt,
 	})
+
 	req := CompletionRequest{
 		Model:       model,
 		Messages:    messages,
@@ -184,69 +192,102 @@ func runExperiment(config *Config, model string) error {
 		Temperature: config.Temperature,
 		TopP:        config.TopP,
 	}
+
+	// Make API call
 	response, err := makeAPICall(config.APIEndpoint, config.APIKey, req)
+
+	// Create experiment result
 	result := ExperimentResult{
 		Timestamp: time.Now(),
 		Model:     model,
 		Request:   req,
 		QueryHash: generateQueryHash(config.UserPrompt),
 	}
+
 	if err != nil {
 		result.ErrorMsg = err.Error()
 		fmt.Printf("  ❌ Error: %v\n", err)
 	} else {
 		result.Response = *response
+		// Extract the actual response content for display
+		var responseContent string
+		if len(response.Choices) > 0 {
+			responseContent = response.Choices[0].Message.Content
+		}
+
 		fmt.Printf("  ✅ Success: %d tokens used\n", response.Usage.TotalTokens)
+		if responseContent != "" {
+			// Show first 100 chars of response
+			preview := responseContent
+			if len(preview) > 100 {
+				preview = preview[:100] + "..."
+			}
+			fmt.Printf("  📝 Response preview: %s\n", preview)
+		} else {
+			fmt.Printf("  ⚠️  Warning: Response content appears to be empty\n")
+		}
 	}
+
+	// Save result
 	filename := generateFilename(model, config.UserPrompt, result.Timestamp)
 	filepath := filepath.Join(config.OutputDir, filename)
+
 	if err := saveResult(filepath, result); err != nil {
 		return fmt.Errorf("failed to save result: %v", err)
 	}
+
 	fmt.Printf("  📁 Saved to: %s\n", filepath)
 	return nil
 }
 
-func makeAPICall(endpoint, apiKey string, compReq CompletionRequest) (*CompletionResponse, error) {
-	b, err := json.Marshal(compReq)
+func makeAPICall(endpoint, apiKey string, req CompletionRequest) (*CompletionResponse, error) {
+	jsonData, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %v", err)
 	}
-	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(b))
+
+	httpReq, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %v", err)
 	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Accept", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+apiKey)
+
 	client := &http.Client{Timeout: 60 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := client.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %v", err)
 	}
 	defer resp.Body.Close()
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %v", err)
 	}
+
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
 	}
+
 	var response CompletionResponse
 	if err := json.Unmarshal(body, &response); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal response: %v", err)
 	}
+
 	return &response, nil
 }
 
 func generateQueryHash(query string) string {
+	// Simple hash based on first few words
 	words := strings.Fields(query)
 	if len(words) == 0 {
 		return "empty"
 	}
 	var hashWords []string
 	for i, word := range words {
-		if i >= 3 { // Use first 3 words
+		if i >= 16 {
 			break
 		}
 		hashWords = append(hashWords, word)
@@ -255,29 +296,29 @@ func generateQueryHash(query string) string {
 }
 
 func generateFilename(model, query string, timestamp time.Time) string {
-	var date = timestamp.Format("20060102150405")
-	model = sanitizeForFilename(model)
-	query = generateQueryHash(query)
-	return fmt.Sprintf("%s_%s_%s.json", date, model, query)
+	dateStr := timestamp.Format("20060102150405")
+	modelStr := sanitizeForFilename(model)
+	queryStr := generateQueryHash(query)
+
+	return fmt.Sprintf("%s_%s_%s.json", dateStr, modelStr, queryStr)
 }
 
 func sanitizeForFilename(s string) string {
-	var (
-		reg       = regexp.MustCompile(`[<>:"/\\|?*\s]+`)
-		sanitized = reg.ReplaceAllString(s, "_")
-	)
+	reg := regexp.MustCompile(`[<>:"/\\|?*\s]+`)
+	sanitized := reg.ReplaceAllString(s, "_")
 	sanitized = strings.Trim(sanitized, "_")
 	if len(sanitized) > 50 {
 		sanitized = sanitized[:50]
 	}
+
 	return sanitized
 }
 
 func saveResult(filepath string, result ExperimentResult) error {
-	b, err := json.Marshal(result)
+	jsonData, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
 		return err
 	}
 
-	return os.WriteFile(filepath, b, 0644)
+	return os.WriteFile(filepath, jsonData, 0644)
 }
