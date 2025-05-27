@@ -141,3 +141,72 @@ faster
 > getting basic string replacement working without the complex DFA
 > construction:
 
+## extra tools
+
+* There is gitingest, a cli to format your project for a prompt
+
+```shellshell
+$ uvx gitingest -o digest.txt
+
+$ head -40 digest.txt
+Directory structure:
+└── repoctx/
+    ├── README.md
+    ├── LICENSE
+    ├── Makefile
+    ├── repoctx
+    └── repoctx.go
+
+================================================
+File: README.md
+================================================
+# repoctx
+
+Convert a git repo into an LLM friendly format.
+
+## TODO
+
+* [ ] clone if url
+* [ ] find files, parse gitignore, git info exclude
+* [ ] render a tree structure
+* [ ] add files
+
+Additional considerations:
+
+* [ ] try to run a test suite
+* [ ] do some static analysis
+* [ ] do some go vet
+* [ ] do some grammer checks
+
+
+
+
+
+================================================
+File: LICENSE
+================================================
+MIT License
+
+```
+
+## TODO
+
+### more systematic experiments
+
+At least three axes:
+
+* [ ] model
+* [ ] prompt
+* [ ] context (file, repo, additional documentation)
+
+### iterative development
+
+A loop.
+
+* prompt, with task
+* sandboxed runtime to run tool
+* gather output, errors messages
+* feed error, output to next prompt
+* some stopping condition
+
+
