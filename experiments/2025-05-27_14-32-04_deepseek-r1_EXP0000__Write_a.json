@@ -1,0 +1,34 @@
+{
+  "timestamp": "2025-05-27T14:32:04.119652793+02:00",
+  "model": "deepseek-r1",
+  "request": {
+    "model": "deepseek-r1",
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are an assistant."
+      },
+      {
+        "role": "user",
+        "content": "EXP0000: Write a small command line application in Go that renders a\npalm tree in the terminal.\n\nContext:\n\nThis is a toy project, akin to cbonsai, a program to grow a bonsai on the\nterminal. We do not want to grow a palm tree, but render trees with colors in\nwith some random aspect. When the program runs, it renders the tree and exists.\nIt does not need to take any parameters and use some random seed to generate\nvariations on each run.\n\nScope:\n\nWrite a command line tool in Go. It should be self contained and use ANSI color\ncodes, which are supported by most terminal emulators. Write the program, there\nare not tests required. The palm should be a of a larger kind, an Arecaceae or\nsimilar. A rendering, that one would associated with a palm tree.\n\nBoundaries:\n\nThe program needs no command line flags. The palm tree should not exceed 20 or\n30 characters in height. A single palm tree suffices. There should be some\nvariation in the rendering.\n\nOnly write out the code, no explanation required.\n\nSpecific Requirements:\n\nWrite idiomatic Go, use short variable names.\n"
+      }
+    ],
+    "max_tokens": 1000,
+    "temperature": 0.7,
+    "top_p": 0.9
+  },
+  "response": {
+    "id": "",
+    "object": "",
+    "created": 0,
+    "model": "",
+    "choices": null,
+    "usage": {
+      "prompt_tokens": 0,
+      "completion_tokens": 0,
+      "total_tokens": 0
+    }
+  },
+  "query_hash": "EXP0000__Write_a",
+  "error": "request failed: context deadline exceeded (Client.Timeout exceeded while awaiting headers)"
+}

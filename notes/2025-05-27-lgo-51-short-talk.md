@@ -8,25 +8,23 @@
   coding tools since BOY 2025 - and to try to document the process:
 [nightjet](https://github.com/miku/nightjet)
 
-Testing various open models.
+Testing various open models:
+
+* codestral-22b,deepseek-r1
+* gemma-3-27b-it
+* llama-3.3-70b-instruct
+* mistral-large-instruct
+* qwen2.5-coder-32b-instruct
+* qwen3-32b
 
 | Organization                     | Model                               | Open | Knowledge cutoff | Context window in tokens | Advantages                                                        | Limitations                | Recommended settings                    |
 |----------------------------------|-------------------------------------|------|------------------|--------------------------|-------------------------------------------------------------------|----------------------------|-----------------------------------------|
-| 🇺🇸 Meta                        | Llama 3.1 8B Instruct               | yes  | Dec 2023         | 128k                     | Fastest overall performance                                       | -                          | default                                 |
 | 🇺🇸 Google                      | Gemma 3 27B Instruct                | yes  | Mar 2024         | 128k                     | Vision, great overall performance                                 | -                          | default                                 |
-| 🇨🇳 OpenGVLab                   | InternVL2.5 8B MPO                  | yes  | Sep 2021         | 32k                      | Vision, lightweight and fast                                      | -                          | default                                 |
-| 🇨🇳 Alibaba Cloud               | Qwen 3 235B A22B                    | yes  | Sep 2024         | 32k                      | Great overall performance, multilingual, global affairs, logic    | -                          | default                                 |
 | 🇨🇳 Alibaba Cloud               | Qwen 3 32B                          | yes  | Sep 2024         | 32k                      | Good overall performance, multilingual, global affairs, logic     | -                          | default                                 |
-| 🇨🇳 Alibaba Cloud               | Qwen QwQ 32B                        | yes  | Sep 2024         | 131k                     | Good overall performance, reasoning and problem-solving           | Political bias             | default, temp=0.6, top_p=0.95           |
 | 🇨🇳 DeepSeek                    | DeepSeek R1                         | yes  | Dec 2023         | 32k                      | Great overall performance, reasoning and problem-solving          | Censorship, political bias | default                                 |
-| 🇨🇳 DeepSeek                    | DeepSeek R1 Distill Llama 70B       | yes  | Dec 2023         | 32k                      | Good overall performance, faster than R1                          | Censorship, political bias | default, temp=0.7, top_p=0.8            |
 | 🇺🇸 Meta                        | Llama 3.3 70B Instruct              | yes  | Dec 2023         | 128k                     | Good overall performance, reasoning and creative writing          | -                          | default, temp=0.7, top_p=0.8            |
-| 🇩🇪 VAGOsolutions x Meta        | Llama 3.1 SauerkrautLM 70B Instruct | yes  | Dec 2023         | 128k                     | German language skills                                            | -                          | default                                 |
 | 🇫🇷 Mistral                     | Mistral Large Instruct              | yes  | Jul 2024         | 128k                     | Good overall performance, coding and multilingual reasoning       | -                          | default                                 |
 | 🇫🇷 Mistral                     | Codestral 22B                       | yes  | Late 2021        | 32k                      | Coding tasks                                                      | -                          | temp=0.2, top_p=0.1, temp=0.6, top_p=0.7|
-| 🇺🇸 intfloat x Mistral          | E5 Mistral 7B Instruct              | yes  | -                | 4096                     | Embeddings                                                        | API Only                   | -                                       |
-| 🇨🇳 Alibaba Cloud               | Qwen 2.5 72B Instruct               | yes  | Sep 2024         | 128k                     | Good overall performance, multilingual, global affairs, logic     | -                          | default, temp=0.2, top_p=0.1            |
-| 🇨🇳 Alibaba Cloud               | Qwen 2.5 VL 72B Instruct            | yes  | Sep 2024         | 90k                      | Vision, multilingual                                              | -                          | default                                 |
 | 🇨🇳 Alibaba Cloud               | Qwen 2.5 Coder 32B Instruct         | yes  | Sep 2024         | 128k                     | Coding tasks                                                      | -                          | default, temp=0.2, top_p=0.1            |
 
 * prompt engineering is really model training (or "[in-context learning](https://arxiv.org/pdf/2301.00234)"), it

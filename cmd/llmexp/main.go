@@ -1,3 +1,5 @@
+// 316cde3a-4a88-460e-a78b-af5fb33ad88c
+
 package main
 
 import (
@@ -70,6 +72,7 @@ type Config struct {
 	TopP         float64
 	SystemFile   string
 	UserFile     string
+	SaveMarkdown bool
 }
 
 func main() {
@@ -130,6 +133,7 @@ func parseFlags() *Config {
 	flag.Float64Var(&config.TopP, "top-p", 0.9, "Top-p for generation")
 	flag.StringVar(&config.SystemFile, "system-file", "", "File containing system prompt")
 	flag.StringVar(&config.UserFile, "user-file", "", "File containing user prompt")
+	flag.BoolVar(&config.SaveMarkdown, "save-md", false, "Save response content to separate .md file")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s [options]\n\n", os.Args[0])
@@ -140,6 +144,7 @@ func parseFlags() *Config {
 		fmt.Fprintf(os.Stderr, "  %s -api-key YOUR_KEY -user \"What is the weather today?\"\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  %s -api-key YOUR_KEY -models \"model1,model2\" -user-file prompt.txt\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  %s -api-key YOUR_KEY -system-file sys.txt -user-file user.txt -output results/\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -api-key YOUR_KEY -user \"Code a palm tree\" -save-md\n", os.Args[0])
 	}
 
 	flag.Parse()
@@ -204,6 +209,10 @@ func runExperiment(config *Config, model string) error {
 		QueryHash: generateQueryHash(config.UserPrompt),
 	}
 
+	// Save result
+	filename := generateFilename(model, config.UserPrompt, result.Timestamp)
+	path := filepath.Join(config.OutputDir, filename)
+
 	if err != nil {
 		result.ErrorMsg = err.Error()
 		fmt.Printf("  ❌ Error: %v\n", err)
@@ -223,20 +232,28 @@ func runExperiment(config *Config, model string) error {
 				preview = preview[:100] + "..."
 			}
 			fmt.Printf("  📝 Response preview: %s\n", preview)
+
+			// Save markdown file if requested and we have content
+			if config.SaveMarkdown && responseContent != "" {
+				mdFilename := strings.TrimSuffix(filename, ".json") + ".md"
+				mdFilepath := filepath.Join(config.OutputDir, mdFilename)
+				if err := saveMarkdown(mdFilepath, responseContent); err != nil {
+					fmt.Printf("  ⚠️  Warning: Failed to save markdown file: %v\n", err)
+				} else {
+					fmt.Printf("  📄 Markdown saved to: %s\n", mdFilepath)
+				}
+			}
+
 		} else {
 			fmt.Printf("  ⚠️  Warning: Response content appears to be empty\n")
 		}
 	}
 
-	// Save result
-	filename := generateFilename(model, config.UserPrompt, result.Timestamp)
-	filepath := filepath.Join(config.OutputDir, filename)
-
-	if err := saveResult(filepath, result); err != nil {
+	if err := saveResult(path, result); err != nil {
 		return fmt.Errorf("failed to save result: %v", err)
 	}
 
-	fmt.Printf("  📁 Saved to: %s\n", filepath)
+	fmt.Printf("  📁 Saved to: %s\n", path)
 	return nil
 }
 
@@ -255,7 +272,7 @@ func makeAPICall(endpoint, apiKey string, req CompletionRequest) (*CompletionRes
 	httpReq.Header.Set("Accept", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+apiKey)
 
-	client := &http.Client{Timeout: 60 * time.Second}
+	client := &http.Client{Timeout: 210 * time.Second}
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %v", err)
@@ -280,18 +297,19 @@ func makeAPICall(endpoint, apiKey string, req CompletionRequest) (*CompletionRes
 }
 
 func generateQueryHash(query string) string {
-	// Simple hash based on first few words
 	words := strings.Fields(query)
 	if len(words) == 0 {
 		return "empty"
 	}
+
 	var hashWords []string
 	for i, word := range words {
-		if i >= 16 {
+		if i >= 10 { // Use first 3 words
 			break
 		}
 		hashWords = append(hashWords, word)
 	}
+
 	return sanitizeForFilename(strings.Join(hashWords, "_"))
 }
 
@@ -304,8 +322,11 @@ func generateFilename(model, query string, timestamp time.Time) string {
 }
 
 func sanitizeForFilename(s string) string {
+	// Replace invalid filename characters
 	reg := regexp.MustCompile(`[<>:"/\\|?*\s]+`)
 	sanitized := reg.ReplaceAllString(s, "_")
+
+	// Remove leading/trailing underscores and limit length
 	sanitized = strings.Trim(sanitized, "_")
 	if len(sanitized) > 50 {
 		sanitized = sanitized[:50]
@@ -321,4 +342,8 @@ func saveResult(filepath string, result ExperimentResult) error {
 	}
 
 	return os.WriteFile(filepath, jsonData, 0644)
+}
+
+func saveMarkdown(filepath, content string) error {
+	return os.WriteFile(filepath, []byte(content), 0644)
 }

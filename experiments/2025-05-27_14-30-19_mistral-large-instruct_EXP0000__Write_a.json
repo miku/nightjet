@@ -1,0 +1,41 @@
+{
+  "timestamp": "2025-05-27T14:30:19.931221286+02:00",
+  "model": "mistral-large-instruct",
+  "request": {
+    "model": "mistral-large-instruct",
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are an assistant."
+      },
+      {
+        "role": "user",
+        "content": "EXP0000: Write a small command line application in Go that renders a\npalm tree in the terminal.\n\nContext:\n\nThis is a toy project, akin to cbonsai, a program to grow a bonsai on the\nterminal. We do not want to grow a palm tree, but render trees with colors in\nwith some random aspect. When the program runs, it renders the tree and exists.\nIt does not need to take any parameters and use some random seed to generate\nvariations on each run.\n\nScope:\n\nWrite a command line tool in Go. It should be self contained and use ANSI color\ncodes, which are supported by most terminal emulators. Write the program, there\nare not tests required. The palm should be a of a larger kind, an Arecaceae or\nsimilar. A rendering, that one would associated with a palm tree.\n\nBoundaries:\n\nThe program needs no command line flags. The palm tree should not exceed 20 or\n30 characters in height. A single palm tree suffices. There should be some\nvariation in the rendering.\n\nOnly write out the code, no explanation required.\n\nSpecific Requirements:\n\nWrite idiomatic Go, use short variable names.\n"
+      }
+    ],
+    "max_tokens": 1000,
+    "temperature": 0.7,
+    "top_p": 0.9
+  },
+  "response": {
+    "id": "chat-c2f9cc30a04246a3bc6af7ad69a0ddf0",
+    "object": "chat.completion",
+    "created": 1748348977,
+    "model": "mistral-large-instruct",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": " ```go\npackage main\n\nimport (\n\t\"fmt\"\n\t\"math/rand\"\n\t\"time\"\n)\n\nfunc main() {\n\trand.Seed(time.Now().UnixNano())\n\tprintPalmTree()\n}\n\nfunc printPalmTree() {\n\tconst trunkHeight = 5\n\tconst leafHeight = 10\n\tconst maxLeafWidth = 15\n\n\tfmt.Print(\"\\033[32m\") // Green color\n\n\t// Print leaves\n\tfor i := 0; i \u003c leafHeight; i++ {\n\t\twidth := maxLeafWidth - rand.Intn(maxLeafWidth/2)\n\t\tfor j := 0; j \u003c width; j++ {\n\t\t\tif rand.Intn(2) == 0 {\n\t\t\t\tfmt.Print(\" \")\n\t\t\t} else {\n\t\t\t\tfmt.Print(\"^\")\n\t\t\t}\n\t\t}\n\t\tfmt.Println()\n\t}\n\n\t// Print trunk\n\tfmt.Print(\"\\033[33m\") // Brown color\n\tfor i := 0; i \u003c trunkHeight; i++ {\n\t\tfor j := 0; j \u003c trunkHeight/2; j++ {\n\t\t\tfmt.Print(\" \")\n\t\t}\n\t\tfmt.Println(\"|||\")\n\t}\n\n\tfmt.Print(\"\\033[0m\") // Reset color\n}\n```"
+        }
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 290,
+      "completion_tokens": 346,
+      "total_tokens": 636
+    }
+  },
+  "query_hash": "EXP0000__Write_a"
+}

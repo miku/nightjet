@@ -1,0 +1,41 @@
+{
+  "timestamp": "2025-05-27T14:29:36.806492065+02:00",
+  "model": "gemma-3-27b-it",
+  "request": {
+    "model": "gemma-3-27b-it",
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are an assistant."
+      },
+      {
+        "role": "user",
+        "content": "EXP0000: Write a small command line application in Go that renders a\npalm tree in the terminal.\n\nContext:\n\nThis is a toy project, akin to cbonsai, a program to grow a bonsai on the\nterminal. We do not want to grow a palm tree, but render trees with colors in\nwith some random aspect. When the program runs, it renders the tree and exists.\nIt does not need to take any parameters and use some random seed to generate\nvariations on each run.\n\nScope:\n\nWrite a command line tool in Go. It should be self contained and use ANSI color\ncodes, which are supported by most terminal emulators. Write the program, there\nare not tests required. The palm should be a of a larger kind, an Arecaceae or\nsimilar. A rendering, that one would associated with a palm tree.\n\nBoundaries:\n\nThe program needs no command line flags. The palm tree should not exceed 20 or\n30 characters in height. A single palm tree suffices. There should be some\nvariation in the rendering.\n\nOnly write out the code, no explanation required.\n\nSpecific Requirements:\n\nWrite idiomatic Go, use short variable names.\n"
+      }
+    ],
+    "max_tokens": 1000,
+    "temperature": 0.7,
+    "top_p": 0.9
+  },
+  "response": {
+    "id": "chatcmpl-9c4956370fc643dca0a9fe492a4de88e",
+    "object": "chat.completion",
+    "created": 1748348966,
+    "model": "gemma-3-27b-it",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "```go\npackage main\n\nimport (\n\t\"fmt\"\n\t\"math/rand\"\n\t\"time\"\n)\n\nfunc main() {\n\trand.Seed(time.Now().UnixNano())\n\n\tcolors := []string{\"\\033[32m\", \"\\033[33m\", \"\\033[36m\"} // Green, Yellow, Cyan\n\treset := \"\\033[0m\"\n\n\th := rand.Intn(10) + 15 // Height\n\tw := rand.Intn(5) + 5   // Width\n\n\tfor i := 0; i \u003c h; i++ {\n\t\tcolor := colors[rand.Intn(len(colors))]\n\t\tspaces := \"\"\n\t\tif i \u003c h-5 {\n\t\t\tspaces = fmt.Sprintf(\"%*s\", h-i, \" \")\n\t\t}\n\n\t\tleaves := \"\"\n\t\tnumLeaves := rand.Intn(w*2) + w\n\t\tfor j := 0; j \u003c numLeaves; j++ {\n\t\t\tleaves += \"🌿\"\n\t\t}\n\n\t\tfmt.Printf(\"%s%s%s\\n\", spaces, color, leaves+reset)\n\t}\n\n\ttrunkHeight := rand.Intn(5) + 3\n\ttrunkWidth := rand.Intn(3) + 1\n\n\tfor i := 0; i \u003c trunkHeight; i++ {\n\t\tspaces := fmt.Sprintf(\"%*s\", h-trunkHeight+i, \" \")\n\t\ttrunk := \"\"\n\t\tfor j := 0; j \u003c trunkWidth; j++ {\n\t\t\ttrunk += \"||\"\n\t\t}\n\t\tfmt.Printf(\"%s\\033[34m%s\\033[0m\\n\", spaces, trunk)\n\t}\n}\n```"
+        }
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 269,
+      "completion_tokens": 404,
+      "total_tokens": 673
+    }
+  },
+  "query_hash": "EXP0000__Write_a"
+}
