@@ -92,7 +92,7 @@ llama-3.3-70b-instruct,gemma-3-27b-it,mistral-large-instruct,qwen3-32b,qwen2.5-c
 
 ## metha feature ✓
 
-* command line harvester for XML data; wanted zstd support
+* [metha](https://github.com/miku/metha) is command line harvester for XML data; wanted zstd support
 * codebase existing and familiar
 * overall useful, somewhat easier to review code; need backwards compatibilty and one function needed more parameters
 * 181 SLOC of migration script; to port existing cache from gzip to zstd; one-time, low risk operation (it is only a cache; saved bandwidth); required additional review for special case
