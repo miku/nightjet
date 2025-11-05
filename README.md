@@ -20,6 +20,7 @@ Some goals are to
 * [x] trcli, a quick trello cli for listing cards on a board plus summary [demo](x/trcli/trcli-demo.gif)
 * [x] [repoctx](https://github.com/miku/repoctx), a repo to llm formatter
 * [x] [apodwall](https://github.com/miku/apodwall), nasa apod downloader and wallpaper switcher
+* [x] [minimalwave](https://github.com/miku/minimalwave), random audio player
 
 ## TODO
 
