@@ -1,6 +1,6 @@
 # coding with ai tools, personal recap
 
-![](../static/palm-montage.png)
+![](2025-11-29-palm-montage.png)
 
 * 20XX: had fun with markov chains
 * 2021: first encounter with Copilot during beta, "funny toy"
