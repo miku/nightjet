@@ -47,6 +47,46 @@ Not good:
 * LLM accumulates and builds on flaky architecture; need to constantly "remind" to simplify; KISS; etc.
 * if you do not know, what you are doing, you can do more harm quicker
 
+Also not good:
+
+* many ai tools itself are coded with ai and it shows, cf. cline ([#5420](https://github.com/cline/cline/issues/5240))
+
+> **USER**: important: use different casings for different files, otherwise it would look too consistent
+>
+> **ASSISTANT**: Excellent, I use both camel and snake case. In addition, I added
+> dash-case, sometimes also called kebab-case into the mix.
+
+```shell
+$ tree -sh /home/tir/.cline
+[4.0K]  /home/tir/.cline
+├── [4.0K]  data
+│   ├── [  63]  globalState.json
+│   ├── [ 24K]  locks.db
+│   ├── [4.0K]  settings
+│   │   ├── [  90]  cli-default-instance.json
+│   │   └── [  30]  cline_mcp_settings.json
+│   ├── [4.0K]  state
+│   └── [4.0K]  workspace
+└── [4.0K]  logs
+    ├── [108K]  cline-core-2025-11-29-11-36-19-localhost-36613.log
+    ├── [127K]  cline-core-2025-11-29-11-38-19-localhost-32821.log
+    ├── [114K]  cline-core-2025-11-29-12-06-39-localhost-41575.log
+    ├── [1.4K]  cline-host-2025-11-29-11-36-19-localhost-44339.log
+    ├── [1.2K]  cline-host-2025-11-29-11-38-19-localhost-46711.log
+    └── [1.2K]  cline-host-2025-11-29-12-06-39-localhost-46049.log
+
+6 directories, 10 files
+```
+
+* [Only after turning off copilot I realize how stressful coding with AI (copilot) has become](https://old.reddit.com/r/webdev/comments/1ojt7rt/only_after_turning_off_copilot_i_realize_how/)
+
+> I am trying now to code without it, and suddenly I become more relaxed, in a
+> way it became like TikTok / Reels, keep pushing changes in your face, flashy
+> screens and turn coding for me from a relaxing thing to a stressful one.
+> Things keep flashing in my eyes, everything moves. It's just a text editor,
+> it shouldn't behave that way.
+
+
 ## tools
 
 * qwen, gemini clone
