@@ -7,7 +7,7 @@
 * 2022: chatgpt, while teaching programming
 * 2023: small bits and pieces, more concerned with local setup, cf. [haiku](https://golangleipzig.space/posts/meetup-35-wrapup/), [ollama testdrive](https://github.com/miku/localmodels)
 
-![](haiku-falcon.png)
+[![](haiku-falcon.png)](https://golangleipzig.space/meetup-38-llm-haiku/meetup-38-llm-haiku.pdf)
 
 * 2024: mostly ignored, little use among [some peers](https://golangleipzig.space/posts/meetup-44-wrapup/)
 * 2025: try more earnest, [nightjet](https://github.com/miku/nightjet), pro
