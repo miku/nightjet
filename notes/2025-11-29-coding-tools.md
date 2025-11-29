@@ -23,13 +23,20 @@ Current assessment:
 * quick usage examples, if I am too lazy to read the docs thoroughly
 
 Somehow it seems to work best, where we already accumulated some debt; like a
-tricky codebase or incomplete documentation.
+tricky codebase or incomplete documentation. It works best for things that
+probably should not be there in the first place.
 
 * probably good for the scientific field, which runs on throwaway code that does not outlive a publication
+
+What agentic coding without comprehension misses is [programming as theory
+building](https://gwern.net/doc/cs/algorithm/1985-naur.pdf) - there needs to be
+a component, that explains the why on various levels, with all the tradeoffs;
+we may get there, or not
 
 Not good:
 
 * could not port a C codebase to go, without basically understanding everything myself, first
+* LLM in 2025 think RAM is infinite
 * LLM does what it is told (except for really bad ideas) and the code ends up 30% longer than it needs to be
 * LLM accumulates and builds on flaky architecture; need to constantly "remind" to simplify; KISS; etc.
 * if you do not know, what you are doing, you can do more harm quicker
