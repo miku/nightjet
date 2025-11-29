@@ -18,6 +18,8 @@ Overall AI resentments, e.g.
 
 * https://bsky.app/profile/mattadvance.bsky.social/post/3m6kny6ijfs2o
 
+![](screenshot-2025-11-29-120328.png)
+
 Current assessment:
 
 * great for throwaway code ("[you will, anyway](https://wiki.c2.com/?PlanToThrowOneAway)"), trcli, apodwall, minimalwave, ...
