@@ -1,5 +1,7 @@
 # coding with ai tools, personal recap
 
+![](../static/palm-montage.png)
+
 * 20XX: had fun with markov chains
 * 2021: first encounter with Copilot during beta, "funny toy"
 * 2022: chatgpt, while teaching programming
