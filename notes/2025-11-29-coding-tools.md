@@ -40,3 +40,8 @@ Not good:
 * LLM does what it is told (except for really bad ideas) and the code ends up 30% longer than it needs to be
 * LLM accumulates and builds on flaky architecture; need to constantly "remind" to simplify; KISS; etc.
 * if you do not know, what you are doing, you can do more harm quicker
+
+## tools
+
+* qwen, gemini clone
+
