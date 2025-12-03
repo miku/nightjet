@@ -111,6 +111,36 @@ Even the hosted qwen model "coder-model" takes a while to work through a task
 
 ![](qwen-remote-stats.png)
 
+```
+╭────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                    │
+│  Session Stats                                                                                     │
+│                                                                                                    │
+│  Interaction Summary                                                                               │
+│  Session ID:                 f377c94b-234e-4398-af3f-103922dc148a                                  │
+│  Tool Calls:                 73 ( ✓ 71 x 2 )                                                       │
+│  Success Rate:               97.3%                                                                 │
+│  User Agreement:             100.0% (36 reviewed)                                                  │
+│  Code Changes:               +923 -83                                                              │
+│                                                                                                    │
+│  Performance                                                                                       │
+│  Wall Time:                  26m 53s                                                               │
+│  Agent Active:               25m 35s                                                               │
+│    » API Time:               15m 1s (58.7%)                                                        │
+│    » Tool Time:              10m 34s (41.3%)                                                       │
+│                                                                                                    │
+│                                                                                                    │
+│  Model Usage                  Reqs   Input Tokens  Output Tokens                                   │
+│  ───────────────────────────────────────────────────────────────                                   │
+│  coder-model                    78      3,804,303         32,595                                   │
+│                                                                                                    │
+│  Savings Highlight: 3,706,213 (97.4%) of input tokens were served from the cache, reducing costs.  │
+│                                                                                                    │
+│  » Tip: For a full token breakdown, run `/stats model`.                                            │
+│                                                                                                    │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────╯
+```
+
 ## ai changes nothing
 
 * [AI changes *Nothing* — Dax Raad, OpenCode](https://www.youtube.com/watch?v=o3gmwzo-Mik)
