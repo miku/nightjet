@@ -105,3 +105,12 @@ qwen3-coder:30b-a3b-q4_K_M    06c1097efce0    25 GB    100% GPU     65536      4
 ```
 
 ![](qwen-local.png)
+
+Even the hosted qwen model "coder-model" takes a while to work through a task
+(while probably using more than 100W).
+
+![](qwen-remote-stats.png)
+
+## ai changes nothing
+
+* [AI changes *Nothing* — Dax Raad, OpenCode](https://www.youtube.com/watch?v=o3gmwzo-Mik)
