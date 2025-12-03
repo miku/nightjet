@@ -94,3 +94,6 @@ $ tree -sh /home/tir/.cline
 
 * qwen, gemini clone
 
+## local first
+
+![](qwen-local.png)
