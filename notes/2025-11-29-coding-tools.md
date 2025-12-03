@@ -180,3 +180,7 @@ output; so maybe, $0.10; assume $0.50/h; $4/day, or $120/month at full usage.
 ## ai changes nothing
 
 * [AI changes *Nothing* — Dax Raad, OpenCode](https://www.youtube.com/watch?v=o3gmwzo-Mik)
+
+## future
+
+[![](image_bf0d1e-s.png)](https://www.pcwelt.de/article/2969289/amd-roadmap-zen-7-radeon-gpu.html)
