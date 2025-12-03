@@ -96,4 +96,12 @@ $ tree -sh /home/tir/.cline
 
 ## local first
 
+So, with 25GB model, slow, but getting through a simple task.
+
+```
+$ ollama ps
+NAME                          ID              SIZE     PROCESSOR    CONTEXT    UNTIL
+qwen3-coder:30b-a3b-q4_K_M    06c1097efce0    25 GB    100% GPU     65536      4 minutes from now
+```
+
 ![](qwen-local.png)
