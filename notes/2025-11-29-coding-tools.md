@@ -139,7 +139,43 @@ Even the hosted qwen model "coder-model" takes a while to work through a task
 │  » Tip: For a full token breakdown, run `/stats model`.                                            │
 │                                                                                                    │
 ╰────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+> /stats model
+
+╭──────────────────────────────────────────────────────╮
+│                                                      │
+│  Model Stats For Nerds                               │
+│                                                      │
+│  Metric                      coder-model             │
+│  ──────────────────────────────────────────────────  │
+│  API                                                 │
+│  Requests                    78                      │
+│  Errors                      0 (0.0%)                │
+│  Avg Latency                 11.6s                   │
+│                                                      │
+│  Tokens                                              │
+│  Total                       3,836,898               │
+│    ↳ Prompt                  3,804,303               │
+│    ↳ Cached                  3,706,213 (97.4%)       │
+│    ↳ Output                  32,595                  │
+│                                                      │
+╰──────────────────────────────────────────────────────╯
+
 ```
+
+how much would it cost, e.g. with [deep infra](https://deepinfra.com/pricing)?
+
+> Qwen/ Qwen3-Coder-480B-A35B-Instruct
+
+> $0.40 in, $1.60 out / 1M tokens
+
+> Qwen3-Coder-480B-A35B-Instruct is the Qwen3's most agentic code model,
+> featuring Significant Performance on Agentic Coding, Agentic Browser-Use and
+> other foundational coding tasks, achieving results comparable to Claude
+> Sonnet.
+
+So this interaction would be $1.60 (in) or w/cache $0.05), $0.05 for the
+output; so maybe, $0.10; assume $0.50/h; $4/day, or $120/month at full usage.
 
 ## ai changes nothing
 
