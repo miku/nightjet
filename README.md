@@ -59,6 +59,7 @@ Some goals are to
 * [ ] tab, chord, game, tui
 * [ ] port of [replace](https://github.com/MariaDB/server/blob/3883eb63dc5e663558571c33d086c9fd3aa0cf8f/extra/replace.c) to go
 * [ ] cli, chessboard image, screenshot, clipboard, evaluation, etc
+* [ ] a cli to search through radio.txt
 
 
 ## Models
