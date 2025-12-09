@@ -21,6 +21,7 @@ Some goals are to
 * [x] [repoctx](https://github.com/miku/repoctx), a repo to llm formatter
 * [x] [apodwall](https://github.com/miku/apodwall), nasa apod downloader and wallpaper switcher
 * [x] [minimalwave](https://github.com/miku/minimalwave), random audio player
+* [x] [animcan](https://github.com/miku/animcan), canned terminal animations
 
 ## TODO
 
