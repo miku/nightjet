@@ -10,6 +10,8 @@ Some goals are to
 * prototype some real (web) applications and ship it,
 * try to think of some *useless* programs that I still find interesting, and implement them.
 
+Status: 7/100
+
 ## DONE
 
 * [x] a program that generates a notebook gif, with a colorful band
