@@ -10,7 +10,7 @@ Some goals are to
 * prototype some real (web) applications and ship it,
 * try to think of some *useless* programs that I still find interesting, and implement them.
 
-Status: 7/100
+Status: 8/100
 
 ## DONE
 
@@ -24,6 +24,7 @@ Status: 7/100
 * [x] [apodwall](https://github.com/miku/apodwall), nasa apod downloader and wallpaper switcher
 * [x] [minimalwave](https://github.com/miku/minimalwave), random audio player
 * [x] [animcan](https://github.com/miku/animcan), canned terminal animations
+* [x] [goliza](https://github.com/miku/goliza), eliza port from python
 
 ## TODO
 
