@@ -10,7 +10,7 @@ Some goals are to
 * prototype some real (web) applications and ship it,
 * try to think of some *useless* programs that I still find interesting, and implement them.
 
-Status: 8/100
+Status: 9/100
 
 ## DONE
 
@@ -25,6 +25,7 @@ Status: 8/100
 * [x] [minimalwave](https://github.com/miku/minimalwave), random audio player
 * [x] [animcan](https://github.com/miku/animcan), canned terminal animations
 * [x] [goliza](https://github.com/miku/goliza), eliza port from python
+* [x] [gh-repos](https://github.com/miku/gh-repos), sync all github repos
 
 ## TODO
 
