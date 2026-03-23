@@ -26,6 +26,7 @@ Status: 9/100
 * [x] [animcan](https://github.com/miku/animcan), canned terminal animations
 * [x] [goliza](https://github.com/miku/goliza), eliza port from python
 * [x] [gh-repos](https://github.com/miku/gh-repos), sync all github repos
+* [x] [claude-switch](https://github.com/miku/claude-switch), switch between API backends
 
 ## TODO
 
