@@ -10,7 +10,7 @@ Some goals are to
 * prototype some real (web) applications and ship it,
 * try to think of some *useless* programs that I still find interesting, and implement them.
 
-Status: 9/100
+Status: 11/100
 
 ## DONE
 
@@ -27,6 +27,7 @@ Status: 9/100
 * [x] [goliza](https://github.com/miku/goliza), eliza port from python
 * [x] [gh-repos](https://github.com/miku/gh-repos), sync all github repos
 * [x] [claude-switch](https://github.com/miku/claude-switch), switch between API backends
+* [x] [typeout](https://github.com/miku/typeout), turn audio or video to text with various models
 
 ## TODO
 
