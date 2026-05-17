@@ -10,7 +10,7 @@ Some goals are to
 * prototype some real (web) applications and ship it,
 * try to think of some *useless* programs that I still find interesting, and implement them.
 
-Status: 13/100
+Status: 14/100
 
 ## DONE
 
@@ -30,6 +30,7 @@ Status: 13/100
 * [x] [typeout](https://github.com/miku/typeout), turn audio or video to text with various models
 * [x] [recap](https://github.com/miku/recap), summarize text
 * [x] [dbisfetch](https://github.com/ubleipzig/bibliocon-2026-595/tree/main/hacking/dbis), specific dataset generation from web pages
+* [x] [doclingclient](https://github.com/miku/doclingclient), Go SDK and cli to talk to a docling server
 
 ## TODO
 
