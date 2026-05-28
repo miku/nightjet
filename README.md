@@ -28,7 +28,7 @@ Status: 14/100
 * [x] [gh-repos](https://github.com/miku/gh-repos), sync all github repos
 * [x] [claude-switch](https://github.com/miku/claude-switch), switch between API backends
 * [x] [typeout](https://github.com/miku/typeout), turn audio or video to text with various models
-* [x] [recap](https://github.com/miku/recap), summarize text
+* [x] [chibi](https://github.com/miku/chibi), summarize text
 * [x] [dbisfetch](https://github.com/ubleipzig/bibliocon-2026-595/tree/main/hacking/dbis), specific dataset generation from web pages
 * [x] [doclingclient](https://github.com/miku/doclingclient), Go SDK and cli to talk to a docling server
 
