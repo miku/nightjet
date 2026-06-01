@@ -10,7 +10,7 @@ Some goals are to
 * prototype some real (web) applications and ship it,
 * try to think of some *useless* programs that I still find interesting, and implement them.
 
-Status: 14/100
+Status: 15/100
 
 ## DONE
 
@@ -31,6 +31,10 @@ Status: 14/100
 * [x] [chibi](https://github.com/miku/chibi), summarize text
 * [x] [dbisfetch](https://github.com/ubleipzig/bibliocon-2026-595/tree/main/hacking/dbis), specific dataset generation from web pages
 * [x] [doclingclient](https://github.com/miku/doclingclient), Go SDK and cli to talk to a docling server
+* [x] various visualizations for Leipzig Gophers, e.g. [Nelder-Mead,
+  visualization](https://github.com/golang-leipzig/golang-leipzig.github.io/tree/source/static/code/lgo-57-opt),
+[synopsis](https://github.com/golang-leipzig/golang-leipzig.github.io/tree/source/static/meetup-60/synopsis),
+[tileseq](https://github.com/golang-leipzig/golang-leipzig.github.io/tree/source/static/everything-is-open-source), ...
 
 ## TODO
 
