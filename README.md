@@ -10,7 +10,7 @@ Some goals are to
 * prototype some real (web) applications and ship it,
 * try to think of some *useless* programs that I still find interesting, and implement them.
 
-Status: 15/100
+Status: 16/100
 
 ## DONE
 
@@ -35,6 +35,7 @@ Status: 15/100
   visualization](https://github.com/golang-leipzig/golang-leipzig.github.io/tree/source/static/code/lgo-57-opt),
 [synopsis](https://github.com/golang-leipzig/golang-leipzig.github.io/tree/source/static/meetup-60/synopsis),
 [tileseq](https://github.com/golang-leipzig/golang-leipzig.github.io/tree/source/static/everything-is-open-source), ...
+* [x] [webscreenie](https://github.com/miku/webscreenie), web page screenshot tool, inspired by [capture-website-cli](https://github.com/sindresorhus/capture-website-cli)
 
 ## TODO
 
