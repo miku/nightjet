@@ -10,7 +10,7 @@ Some goals are to
 * prototype some real (web) applications and ship it,
 * try to think of some *useless* programs that I still find interesting, and implement them.
 
-Status: 16/100
+Status: 17/100
 
 ## DONE
 
