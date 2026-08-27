@@ -36,6 +36,7 @@ Status: 16/100
 [synopsis](https://github.com/golang-leipzig/golang-leipzig.github.io/tree/source/static/meetup-60/synopsis),
 [tileseq](https://github.com/golang-leipzig/golang-leipzig.github.io/tree/source/static/everything-is-open-source), ...
 * [x] [webscreenie](https://github.com/miku/webscreenie), web page screenshot tool, inspired by [capture-website-cli](https://github.com/sindresorhus/capture-website-cli)
+* [x] [tldhunter](https://github.com/miku/tldhunter), domain name check cli
 
 ## TODO
 
