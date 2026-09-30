@@ -10,7 +10,7 @@ Some goals are to
 * prototype some real (web) applications and ship it,
 * try to think of some *useless* programs that I still find interesting, and implement them.
 
-Status: 17/100
+Status: 18/100
 
 ## DONE
 
@@ -37,6 +37,7 @@ Status: 17/100
 [tileseq](https://github.com/golang-leipzig/golang-leipzig.github.io/tree/source/static/everything-is-open-source), ...
 * [x] [webscreenie](https://github.com/miku/webscreenie), web page screenshot tool, inspired by [capture-website-cli](https://github.com/sindresorhus/capture-website-cli)
 * [x] [tldhunter](https://github.com/miku/tldhunter), domain name check cli
+* [x] [glean](https://github.com/miku/glean), yet another domain name check cli
 
 ## TODO
 
